@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/header :: head(title='Thanh toán – BeautyStore')}">
+</head>
+<body>
+<div th:replace="~{fragments/header :: header}"></div>
+
+<!-- Page Header -->
+<section class="profile-header" id="main-content">
+    <div class="container text-center">
+        <h1 class="display-5 fw-bold"><i class="fas fa-bag-shopping me-3"></i>Hoàn tất đơn hàng</h1>
+        <p class="lead">Hoàn tất thông tin để BeautyStore giao đơn hàng đến bạn</p>
+    </div>
+</section>
+
+<div class="container py-5">
+    <div class="row">
+        <!-- Checkout Form -->
+        <div class="col-lg-7 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header" style="background: linear-gradient(135deg, var(--beauty-berry) 0%, var(--beauty-plum) 100%); color: white;">
+                    <h5 class="mb-0"><i class="fas fa-user me-2"></i>Thông tin người nhận</h5>
+                </div>
+                <div class="card-body">
+                    <form id="checkoutForm">
+                        <div class="mb-3">
+                            <label for="customerName" class="form-label">
+                                <i class="fas fa-user me-1 text-primary"></i>Họ và tên
+                                <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="customerName" required>
+                            <div class="invalid-feedback">Vui lòng nhập họ tên</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="customerEmail" class="form-label">
+                                <i class="fas fa-envelope me-1 text-primary"></i>Email
+                                <span class="text-danger">*</span>
+                            </label>
+                            <input type="email" class="form-control" id="customerEmail" required>
+                            <div class="invalid-feedback">Vui lòng nhập email hợp lệ</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="customerPhone" class="form-label">
+                                <i class="fas fa-phone me-1 text-primary"></i>Số điện thoại
+                                <span class="text-danger">*</span>
+                            </label>
+                            <input type="tel" class="form-control" id="customerPhone" pattern="[0-9]{10,11}" required>
+                            <div class="invalid-feedback">Vui lòng nhập số điện thoại hợp lệ (10-11 số)</div>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-4">
+                                    <label for="shippingProvince" class="form-label">Tỉnh / thành phố <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="shippingProvince" autocomplete="address-level1" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="shippingDistrict" class="form-label">Quận / huyện <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="shippingDistrict" autocomplete="address-level2" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="shippingWard" class="form-label">Phường / xã <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="shippingWard" autocomplete="address-level3" required>
+                                </div>
+                            </div>
+                            <label for="shippingAddress" class="form-label">
+                                <i class="fas fa-map-marker-alt me-1 text-primary"></i>Số nhà, tên đường
+                                <span class="text-danger">*</span>
+                            </label>
+                            <textarea class="form-control" id="shippingAddress" rows="3" required></textarea>
+                            <div class="invalid-feedback">Vui lòng nhập địa chỉ giao hàng</div>
+                        </div>
+
+                        <hr>
+
+                        <h6 class="mb-3"><i class="fas fa-credit-card me-2 text-success"></i>Phương thức thanh toán</h6>
+                        <div class="payment-methods">
+                            <div class="form-check payment-option mb-3">
+                                <input class="form-check-input" type="radio" name="paymentMethod" id="codPayment" value="COD" checked>
+                                <label class="form-check-label w-100" for="codPayment">
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-money-bill-wave fa-2x text-success me-3"></i>
+                                        <div>
+                                            <strong>Thanh toán khi nhận hàng (COD)</strong>
+                                            <p class="text-muted small mb-0">Thanh toán bằng tiền mặt khi nhận hàng</p>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <div class="form-check payment-option mb-3">
+                                <input class="form-check-input" type="radio" name="paymentMethod" id="eWallet" value="VNPAY">
+                                <label class="form-check-label w-100" for="eWallet">
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-wallet fa-2x text-warning me-3"></i>
+                                        <div>
+                                            <strong>Thanh toán trực tuyến qua VNPay</strong>
+                                            <p class="text-muted small mb-0">Chuyển đến cổng VNPay bảo mật để hoàn tất thanh toán</p>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+
+                        </div>
+
+                        <hr>
+
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">
+                                <i class="fas fa-comment me-1 text-info"></i>Ghi chú (Tùy chọn)
+                            </label>
+                            <textarea class="form-control" id="notes" rows="2" placeholder="Ghi chú thêm về đơn hàng..."></textarea>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Order Summary -->
+        <div class="col-lg-5">
+            <div class="card shadow-sm sticky-top" style="top: 80px;">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="fas fa-shopping-bag me-2"></i>Đơn hàng của bạn</h5>
+                </div>
+                <div class="card-body" id="orderSummaryContainer"
+                     th:attr="data-shipping-fee=${@storeProperties.shippingFee},data-free-shipping-threshold=${@storeProperties.freeShippingThreshold}">
+                    <!-- Loading -->
+                    <div id="summaryLoading" class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Đang tải...</span>
+                        </div>
+                    </div>
+
+                    <!-- Order Items -->
+                    <div id="orderItemsList" style="display: none;">
+                        <div id="checkoutAvailabilityAlert" role="status" aria-live="polite" hidden></div>
+                        <div id="itemsContainer" class="mb-3" style="max-height: 300px; overflow-y: auto;">
+                            <!-- Items will be loaded here -->
+                        </div>
+                        
+                        <hr>
+                        
+                        <div class="order-totals">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Tạm tính:</span>
+                                <strong id="subtotal">0 ₫</strong>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Phí vận chuyển:</span>
+                                <strong id="shippingFee" th:text="${#numbers.formatDecimal(@storeProperties.shippingFee, 0, 'POINT', 0, 'COMMA') + '₫'}">30.000 ₫</strong>
+                            </div>
+                            
+                            <!-- Voucher Display -->
+                            <div id="voucherDisplay" style="display: none;">
+                                <div class="d-flex justify-content-between mb-2 text-success">
+                                    <span><i class="fas fa-ticket-alt me-1"></i><span id="checkoutVoucherLabel">Mã giảm giá</span> (<strong id="displayVoucherCode"></strong>):</span>
+                                    <strong id="displayVoucherDiscount">- 0 ₫</strong>
+                                </div>
+                            </div>
+                            
+                            <hr>
+                            <div class="d-flex justify-content-between mb-3">
+                                <h5 class="mb-0">Tổng cộng:</h5>
+                                <h5 class="mb-0 text-danger" id="totalAmount">0 ₫</h5>
+                            </div>
+                        </div>
+
+                        <button type="button" class="btn btn-success w-100 btn-lg mb-2" id="placeOrderBtn">
+                            <i class="fas fa-check-circle me-2"></i>Đặt hàng ngay
+                        </button>
+                        <a href="/cart" class="btn btn-outline-secondary w-100">
+                            <i class="fas fa-arrow-left me-2"></i>Quay lại giỏ hàng
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div th:replace="~{fragments/footer :: footer}"></div>
+
+<!-- JavaScript -->
+<script src="/js/auth.js"></script>
+<script src="/js/checkout.js"></script>
+</body>
+</html>

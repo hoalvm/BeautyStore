@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/header :: head(title='Thanh toán an toàn - BeautyStore')}">
+</head>
+<body>
+    <div th:replace="~{fragments/header :: header}"></div>
+
+    <div class="container my-5" id="main-content">
+        <div class="row">
+            <div class="col-lg-10 mx-auto">
+                <!-- Header -->
+                <div class="text-center mb-5">
+                    <h1 class="display-4 fw-bold mb-3">
+                        Thanh toán an toàn
+                    </h1>
+                    <p class="lead text-muted">Các biện pháp bảo vệ thông tin thanh toán và quyền riêng tư</p>
+                </div>
+
+                <!-- Factual payment safeguards; certification badges are only
+                     shown when a verified certification is configured. -->
+                <div class="text-center mb-5">
+                    <span class="badge bg-success fs-5 me-2 mb-2">
+                        Xác minh phía máy chủ
+                    </span>
+                    <span class="badge bg-primary fs-5 me-2 mb-2">
+                        Cổng thanh toán VNPay
+                    </span>
+                    <span class="badge bg-warning text-dark fs-5 me-2 mb-2">
+                        Không lưu dữ liệu thẻ
+                    </span>
+                </div>
+
+                <!-- Payment methods -->
+                <div class="card shadow-lg border-0 mb-4">
+                    <div class="card-body p-5">
+                        <h3 class="text-success mb-4">Phương thức thanh toán</h3>
+                        
+                        <div class="row g-4 mb-5">
+                            <div class="col-md-6">
+                                <div class="card h-100 border-2 border-primary">
+                                    <div class="card-body text-center">
+                                        <h5 class="card-title">VNPay</h5>
+                                        <p class="card-text">Thanh toán trực tuyến tại cổng VNPay</p>
+                                        <span class="badge bg-primary">Trực tuyến</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="card h-100 border-2 border-success">
+                                    <div class="card-body text-center">
+                                        <h5 class="card-title">COD</h5>
+                                        <p class="card-text">Thanh toán khi nhận hàng</p>
+                                        <span class="badge bg-success">Tiện lợi</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <hr class="my-4">
+
+                        <h3 class="text-success mb-4">Bảo mật thanh toán</h3>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <h5>Kiểm tra đơn hàng</h5>
+                                        <p class="mb-0 small">Số tiền thanh toán được lấy từ đơn hàng do máy chủ xác nhận</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <h5>Xác nhận từ VNPay</h5>
+                                        <p class="mb-0 small">Đơn trực tuyến chỉ được xác nhận sau phản hồi hợp lệ từ cổng thanh toán</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <h5>Không lưu thẻ</h5>
+                                        <p class="mb-0 small">BeautyStore không lưu trữ thông tin thẻ của bạn</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <h5>Hỗ trợ đối soát</h5>
+                                        <p class="mb-0 small">Liên hệ BeautyStore nếu trạng thái đơn chưa khớp với giao dịch</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <h3 class="text-success mb-4">Quy trình thanh toán</h3>
+                        <ol class="list-group list-group-numbered">
+                            <li class="list-group-item">Chọn sản phẩm và thêm vào giỏ hàng</li>
+                            <li class="list-group-item">Điền thông tin giao hàng</li>
+                            <li class="list-group-item">Chọn phương thức thanh toán</li>
+                            <li class="list-group-item">Xác nhận và hoàn tất thanh toán</li>
+                            <li class="list-group-item">Nhận mã đơn hàng qua email/SMS</li>
+                        </ol>
+
+                        <div class="alert alert-success mt-4">
+                            <h5 class="alert-heading">Lưu ý quan trọng</h5>
+                            <ul class="mb-0">
+                                <li>BeautyStore <strong>KHÔNG BAO GIỜ</strong> yêu cầu mã CVV/OTP qua điện thoại</li>
+                                <li>Kiểm tra kỹ URL có ổ khóa trước khi nhập thông tin</li>
+                                <li>Không chia sẻ thông tin thẻ với bất kỳ ai</li>
+                                <li>Liên hệ ngay nếu phát hiện giao dịch bất thường</li>
+                            </ul>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <h3 class="text-success mb-4">Hỗ trợ thanh toán</h3>
+                        <p>Gặp vấn đề khi thanh toán? Liên hệ ngay:</p>
+                        <div class="bg-light p-4 rounded">
+                            <p class="mb-2"><strong>Hotline:</strong> <span th:text="${@storeProperties.hotline}">1800-8080</span></p>
+                            <p class="mb-2"><strong>Email:</strong> <span th:text="${@storeProperties.supportEmail}">support@beautystore.vn</span></p>
+                            <p class="mb-0"><strong>Chat:</strong> Widget góc phải màn hình</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Back button -->
+                <div class="text-center">
+                    <a href="/" class="btn btn-success btn-lg">
+                        Quay về trang chủ
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div th:replace="~{fragments/footer :: footer}"></div>
+
+    <script th:src="@{/js/auth.js}"></script>
+</body>
+</html>

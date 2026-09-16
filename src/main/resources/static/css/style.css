@@ -1,0 +1,803 @@
+@font-face {
+    font-family: "Beauty Inter";
+    src: url("/fonts/inter-variable.ttf") format("truetype");
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Beauty Cormorant";
+    src: url("/fonts/cormorant-garamond-variable.ttf") format("truetype");
+    font-style: normal;
+    font-weight: 300 700;
+    font-display: swap;
+}
+
+:root {
+    --white: #ffffff;
+    --light-gray: #f7f4f2;
+    --dark-gray: #34272f;
+    --beauty-ivory: #fffaf6;
+    --beauty-rose: #a93f68;
+    --beauty-berry: #7b294c;
+    --beauty-plum: #4c263b;
+    --beauty-sage: #718b76;
+    --beauty-blush: #f4dce5;
+    --beauty-border: #eadde2;
+    --beauty-gold: #e6b566;
+}
+
+/* Global Styles */
+body {
+    font-family: "Beauty Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    color: var(--dark-gray);
+    background: var(--beauty-ivory);
+    min-height: 100vh;
+}
+
+.beauty-heading,
+h1,
+h2 {
+    font-family: "Beauty Cormorant", Georgia, serif;
+    letter-spacing: -0.015em;
+}
+
+/* BeautyStore gradient surface */
+.beauty-nav-bg {
+    background: linear-gradient(120deg, var(--beauty-plum), var(--beauty-berry));
+    position: relative;
+    overflow: hidden;
+}
+
+.beauty-nav-bg::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(115deg, transparent 55%, rgba(255, 255, 255, 0.12));
+    pointer-events: none;
+}
+
+/* Header Styles */
+.header-section .top-bar {
+    font-size: 0.875rem;
+    background: var(--beauty-plum) !important;
+}
+
+.header-section .navbar-brand {
+    color: var(--beauty-berry) !important;
+    transition: all 0.3s ease;
+    font-size: 2.5rem !important;
+    text-shadow: none;
+}
+
+.header-section .navbar-brand:hover {
+    color: var(--beauty-plum) !important;
+    transform: translateY(-1px);
+}
+
+.brand-icon {
+    color: var(--beauty-rose) !important;
+    font-size: 2.35rem !important;
+}
+
+.search-section .form-control {
+    border: 1px solid var(--beauty-border);
+    border-radius: 12px 0 0 12px;
+    padding: 0.75rem 1.25rem;
+    transition: all 0.3s ease;
+}
+
+.search-section .btn {
+    border-radius: 0 12px 12px 0;
+    background: var(--beauty-berry);
+    border: 1px solid var(--beauty-berry);
+    transition: all 0.3s ease;
+}
+
+.search-section .btn:hover {
+    background: #115e59;
+    transform: none;
+    box-shadow: 0 5px 15px rgba(15, 118, 110, 0.2);
+}
+
+.category-nav {
+    background: linear-gradient(120deg, var(--beauty-plum), var(--beauty-berry)) !important;
+    position: relative;
+    padding: 0.5rem 0 !important;
+}
+
+.category-nav .navbar-nav {
+    position: relative;
+    z-index: 1;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+}
+
+.category-nav .nav-link {
+    transition: all 0.3s ease;
+    padding: 0.5rem 0.75rem !important;
+    border-radius: 8px;
+    margin: 0 0.125rem;
+    font-weight: bold;
+    text-shadow: none;
+    font-size: 0.875rem;
+    white-space: nowrap;
+}
+
+.category-nav .nav-link:hover {
+    background: rgba(255, 255, 255, 0.16);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(255, 255, 255, 0.3);
+}
+
+/* Cart button */
+.cart-btn {
+    background: var(--beauty-gold);
+    color: #1e293b !important;
+    border: none;
+    border-radius: 50px;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.3);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.cart-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 5px 20px rgba(255, 193, 7, 0.5);
+}
+
+.cart-btn .badge {
+    transition: all 0.3s ease;
+}
+
+/* Authentication */
+.auth-container {
+    min-height: 80vh;
+    display: flex;
+    align-items: center;
+    background: linear-gradient(135deg, #fffaf6 0%, #f9edf2 55%, #f2f5ef 100%);
+}
+
+.auth-card {
+    background: white;
+    border-radius: 18px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    border: 1px solid var(--beauty-border);
+}
+
+.auth-header {
+    background: linear-gradient(135deg, var(--beauty-berry) 0%, var(--beauty-plum) 100%);
+    color: white;
+    padding: 2rem;
+    text-align: center;
+    position: relative;
+}
+
+.auth-header::before {
+    content: '✿';
+    position: absolute;
+    top: 10px;
+    left: 20px;
+    font-size: 1.5rem;
+}
+
+.auth-header::after {
+    content: '♡';
+    position: absolute;
+    top: 10px;
+    right: 20px;
+    font-size: 1.5rem;
+}
+
+.auth-body {
+    padding: 2rem;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
+}
+
+.form-control {
+    border-radius: 12px;
+    border: 1px solid var(--beauty-border);
+    padding: 0.75rem 1.25rem;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus {
+    border-color: var(--beauty-rose);
+    box-shadow: 0 0 0 0.2rem rgba(20, 184, 166, 0.18);
+    transform: none;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--beauty-berry) 0%, var(--beauty-plum) 100%);
+    border: none;
+    border-radius: 12px;
+    padding: 0.75rem 2rem;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(15, 118, 110, 0.22);
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    border: none;
+    border-radius: 12px;
+    padding: 0.75rem 2rem;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.btn-danger:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(233, 30, 99, 0.3);
+}
+
+.btn-success {
+    background: linear-gradient(135deg, var(--beauty-rose) 0%, #16a34a 100%);
+    border: none;
+    border-radius: 25px;
+    padding: 0.75rem 2rem;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 188, 212, 0.3);
+}
+
+/* Footer */
+.footer-section {
+    background: linear-gradient(135deg, #3b2030 0%, #6d2947 100%) !important;
+    position: relative;
+}
+
+.footer-section::before {
+    content: none;
+}
+
+.footer-section .container {
+    position: relative;
+    z-index: 1;
+}
+
+/* Footer Categories Styles */
+.footer-categories li {
+    transition: all 0.3s ease;
+}
+
+.footer-categories li:hover {
+    transform: translateX(5px);
+}
+
+.footer-categories a {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.footer-categories a::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 0;
+    height: 2px;
+    background: var(--beauty-gold);
+    transition: width 0.3s ease;
+}
+
+.footer-categories a:hover {
+    color: var(--beauty-gold) !important;
+    padding-left: 0.5rem;
+}
+
+.footer-categories a:hover::before {
+    width: 100%;
+}
+
+.footer-categories a span {
+    font-size: 1.1em;
+    display: inline-block;
+    transition: transform 0.3s ease;
+}
+
+.footer-categories a:hover span {
+    transform: scale(1.2) rotate(10deg);
+}
+
+/* Footer Policies Styles */
+.footer-policies li {
+    transition: all 0.3s ease;
+}
+
+.footer-policies li:hover {
+    transform: translateX(5px);
+}
+
+.footer-policies a {
+    display: inline-block;
+    padding: 0.25rem 0;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.footer-policies a::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 0;
+    height: 2px;
+    background: var(--beauty-gold);
+    transition: width 0.3s ease;
+}
+
+.footer-policies a:hover {
+    color: var(--beauty-gold) !important;
+    padding-left: 0.5rem;
+}
+
+.footer-policies a:hover::before {
+    width: 100%;
+}
+
+.hover-danger:hover {
+    color: var(--beauty-gold) !important;
+}
+
+
+/* Home page */
+.hero-section {
+    background: linear-gradient(135deg, var(--beauty-berry) 0%, var(--beauty-plum) 100%);
+    color: white;
+    padding: 4rem 0;
+    position: relative;
+    overflow: hidden;
+}
+
+.hero-section::before {
+    content: none;
+}
+
+.featured-card {
+    border: none;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 3px solid transparent;
+    background: linear-gradient(white, white) padding-box,
+    linear-gradient(135deg, var(--beauty-rose), var(--beauty-plum)) border-box;
+}
+
+.featured-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+    border-color: var(--beauty-gold);
+}
+
+.featured-card .btn {
+    border-radius: 50px;
+    transition: all 0.3s ease;
+}
+
+.featured-card .btn:hover {
+    transform: scale(1.05);
+}
+
+/* Profile Page Styles */
+.profile-header {
+    background: linear-gradient(135deg, var(--beauty-berry) 0%, var(--beauty-plum) 100%);
+    color: white;
+    padding: 2rem 0;
+    margin-bottom: 2rem;
+    position: relative;
+}
+
+.profile-card {
+    border: none;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    border-radius: 16px;
+    border: 1px solid var(--beauty-border);
+}
+
+/* Message Styles */
+#registerMessage,
+#verifyMessage,
+#loginMessage,
+#forgotMessage,
+#resetMessage,
+#profileMessage {
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: 15px;
+    font-weight: 600;
+    border: 2px solid;
+    animation: message-glow 0.5s ease-in-out;
+}
+
+@keyframes message-glow {
+    0% {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Outline buttons */
+.btn-outline-primary,
+.btn-outline-success,
+.btn-outline-info,
+.btn-outline-warning {
+    border-radius: 10px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    border-width: 2px;
+}
+
+.btn-outline-primary:hover {
+    background: linear-gradient(135deg, var(--beauty-berry) 0%, var(--beauty-plum) 100%);
+    transform: translateY(-2px);
+}
+
+.btn-outline-success:hover {
+    background: linear-gradient(135deg, var(--beauty-rose) 0%, #16a34a 100%);
+    transform: translateY(-2px);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .search-section {
+        margin: 1rem 0;
+    }
+
+    .user-actions {
+        flex-direction: row;
+        justify-content: center;
+    }
+
+    .auth-body {
+        padding: 1.5rem;
+    }
+
+    .hero-section {
+        padding: 2rem 0;
+    }
+
+    .header-section .navbar-brand {
+        font-size: 2rem !important;
+    }
+
+    .brand-icon {
+        font-size: 2.2rem !important;
+    }
+
+    .category-nav .nav-link {
+        font-size: 0.75rem;
+        padding: 0.4rem 0.6rem !important;
+    }
+}
+
+/* Loading animation */
+.loading-spinner {
+    display: inline-block;
+    animation: loading-spin 1s linear infinite;
+}
+
+@keyframes loading-spin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* Product Card Image Styles */
+.card-img-top {
+    width: 100%;
+    height: 250px;
+    object-fit: cover;
+    object-position: center;
+}
+
+/* Product Detail Page - Keep Original Aspect Ratio */
+/* Ảnh chính trong trang chi tiết sản phẩm */
+#productDetailContainer .col-lg-6 .card .card-img-top {
+    height: auto;
+    max-height: 600px;
+    object-fit: contain;
+    background-color: #f8f9fa;
+    padding: 1rem;
+}
+
+/* Sản phẩm liên quan vẫn dùng crop */
+#relatedProducts .card-img-top {
+    height: 250px;
+    object-fit: cover;
+}
+
+/* BeautyStore utilities; old class names remain as compatibility aliases. */
+.beauty-gradient-text {
+    background: linear-gradient(135deg, var(--beauty-berry) 0%, var(--beauty-plum) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: bold;
+}
+
+.beauty-primary-btn {
+    background: linear-gradient(135deg, var(--beauty-berry) 0%, var(--beauty-plum) 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 0.5rem 1.5rem;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.beauty-primary-btn:hover {
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(15, 118, 110, 0.25);
+}
+
+.product-meta-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.product-meta-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.55rem;
+    border: 1px solid #bfdbfe;
+    border-radius: 999px;
+    background: #eff6ff;
+    color: #1e40af;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.product-meta-chip:first-child {
+    border-color: #e6b8c9;
+    background: #fff3f7;
+    color: var(--beauty-berry);
+}
+
+/* Accessibility and clean-beauty components */
+.skip-link {
+    position: fixed;
+    left: 1rem;
+    top: -5rem;
+    z-index: 2000;
+    padding: .75rem 1rem;
+    border-radius: .5rem;
+    background: var(--beauty-plum);
+    color: #fff;
+}
+
+.skip-link:focus { top: 1rem; }
+
+:focus-visible {
+    outline: 3px solid #d59538;
+    outline-offset: 3px;
+}
+
+.beauty-eyebrow {
+    color: var(--beauty-berry);
+    font-size: .78rem;
+    font-weight: 800;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+}
+
+.beauty-heading,
+.navbar-brand {
+    font-family: Georgia, "Times New Roman", serif;
+    letter-spacing: -.025em;
+}
+
+.beauty-hero {
+    min-height: min(680px, 78vh);
+    display: grid;
+    align-items: center;
+    color: var(--beauty-plum);
+    background-color: #f8e9ee;
+    background-image: linear-gradient(90deg, rgba(255,250,246,.98) 0%, rgba(255,250,246,.9) 38%, rgba(255,250,246,.12) 68%), url('/images/beauty/hero-beautystore-v2.webp');
+    background-position: center, center right;
+    background-size: cover;
+}
+
+.beauty-hero-copy { max-width: 620px; }
+.beauty-hero h1 { font-size: clamp(2.6rem, 7vw, 5.4rem); line-height: .98; }
+
+.beauty-pill,
+.shade-swatch {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    border: 1px solid var(--beauty-border);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--beauty-plum);
+    padding: .42rem .75rem;
+    font-size: .8rem;
+    font-weight: 700;
+}
+
+.shade-dot {
+    width: 1rem;
+    height: 1rem;
+    border: 1px solid rgba(0,0,0,.2);
+    border-radius: 50%;
+    background: var(--shade, #eee);
+}
+
+.variant-option[aria-pressed="true"] {
+    border-color: var(--beauty-berry);
+    background: #fff0f5;
+    box-shadow: 0 0 0 2px rgba(123,41,76,.13);
+}
+
+.beauty-card {
+    height: 100%;
+    overflow: hidden;
+    border: 1px solid var(--beauty-border);
+    border-radius: 1.25rem;
+    background: #fff;
+    box-shadow: 0 12px 38px rgba(76,38,59,.08);
+    transition: transform .25s ease, box-shadow .25s ease;
+}
+
+.beauty-card:hover { transform: translateY(-4px); box-shadow: 0 18px 45px rgba(76,38,59,.14); }
+.beauty-card img { aspect-ratio: 1 / 1; width: 100%; object-fit: cover; background: #faf7f5; }
+.beauty-section { padding-block: clamp(3rem, 7vw, 6rem); }
+.beauty-soft-bg { background: #f9eff3; }
+.beauty-sage-bg { background: #eef2ec; }
+.product-gallery-thumb { width: 76px; height: 76px; object-fit: cover; border-radius: .75rem; border: 1px solid var(--beauty-border); }
+.product-gallery-thumb[aria-current="true"] { border: 2px solid var(--beauty-berry); }
+.product-gallery-frame { height: auto; }
+
+@media (max-width: 991.98px) {
+    .header-section .navbar .container { flex-wrap: wrap; }
+    .header-section .navbar-collapse { width: 100%; padding-top: 1rem; }
+    .header-section .search-section { margin: 0 0 1rem !important; }
+    .header-section .user-actions { justify-content: center; flex-wrap: wrap; gap: .25rem; }
+    .beauty-hero {
+        min-height: 620px;
+        align-items: end;
+        padding-bottom: 3rem;
+        background-image: linear-gradient(0deg, rgba(255,250,246,.98) 0%, rgba(255,250,246,.88) 48%, rgba(255,250,246,.08) 78%), url('/images/beauty/hero-beautystore-v2.webp');
+        background-position: center, center top;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        scroll-behavior: auto !important;
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+    }
+}
+
+.product-specifications {
+    padding: 1rem;
+    border: 1px solid var(--beauty-border);
+    border-radius: 14px;
+    background: #f8fafc;
+}
+
+.specification-table th {
+    width: 38%;
+    color: #475569;
+    font-weight: 600;
+}
+
+.specification-table td,
+.specification-table th {
+    padding: 0.5rem 0.65rem;
+    border-color: #e2e8f0;
+}
+
+.specification-notes {
+    color: #475569;
+}
+
+.specification-notes p {
+    white-space: pre-line;
+}
+
+/* Checkout Page Styles */
+.payment-option {
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    padding: 15px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.payment-option:hover {
+    border-color: var(--beauty-rose);
+    background-color: #f8f9fa;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.payment-option input[type="radio"]:checked ~ label {
+    border-color: var(--beauty-plum);
+}
+
+.payment-option .form-check-input:checked {
+    background-color: var(--beauty-plum);
+    border-color: var(--beauty-plum);
+}
+
+.checkout-item,
+.order-item {
+    transition: background-color 0.2s ease;
+}
+
+.checkout-item:hover,
+.order-item:hover {
+    background-color: #f8f9fa;
+}
+
+/* Order Confirmation Styles */
+.success-animation {
+    animation: bounceIn 0.6s ease-out;
+}
+
+@keyframes bounceIn {
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.1);
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.order-number-box {
+    animation: fadeInUp 0.8s ease-out 0.3s both;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

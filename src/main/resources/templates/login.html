@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/header :: head(title='Đăng nhập – BeautyStore')}">
+</head>
+<body>
+    <div th:replace="~{fragments/header :: header}"></div>
+
+    <div class="auth-container" id="main-content">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-md-6 col-lg-5">
+                    <div class="auth-card">
+                        <div class="auth-header">
+                            <h2 class="mb-0"><i class="fas fa-spa me-2"></i>Chào mừng trở lại!</h2>
+                            <p class="mb-0 mt-2 opacity-75">Đăng nhập để tiếp tục mua sắm tại BeautyStore.</p>
+                        </div>
+                        <div class="auth-body">
+                            <form id="loginForm">
+                                <div class="mb-3">
+                                    <label for="loginEmail" class="form-label">Email</label>
+                                    <input type="email" class="form-control form-control-lg" id="loginEmail" name="email" required>
+                                </div>
+                                <div class="mb-4">
+                                    <label for="loginPassword" class="form-label">Mật khẩu bí mật</label>
+                                    <input type="password" class="form-control form-control-lg" id="loginPassword" name="password" required>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-lg w-100 mb-3">
+                                    <i class="fas fa-sign-in-alt me-2"></i>Đăng nhập
+                                </button>
+                            </form>
+                            
+                            <div id="loginMessage" class="mt-3 d-none"></div>
+                            
+                            <div class="text-center">
+                                <a th:href="@{/forgot-password}" class="text-decoration-none">Quên mật khẩu?</a>
+                            </div>
+                            <hr>
+                            <div class="text-center">
+                                <span class="text-muted">Chưa có tài khoản? </span>
+                                <a th:href="@{/register}" class="text-decoration-none fw-semibold">Gia nhập ngay</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div th:replace="~{fragments/footer :: footer}"></div>
+    <script th:src="@{/js/auth.js}" defer></script>
+</body>
+</html>

@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/header :: head(title='Đơn hàng của tôi – BeautyStore')}">
+</head>
+<body>
+<div th:replace="~{fragments/header :: header}"></div>
+
+<!-- Page Header -->
+<section class="profile-header" id="main-content">
+    <div class="container text-center">
+        <h1 class="display-5 fw-bold"><i class="fas fa-list-alt me-3"></i>Đơn hàng của tôi</h1>
+        <p class="lead">Theo dõi trạng thái giao đơn mỹ phẩm của bạn</p>
+    </div>
+</section>
+
+<div class="container py-5">
+    <div class="row">
+        <div class="col-12">
+            <!-- Loading -->
+            <div id="ordersLoading" class="text-center py-5">
+                <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                    <span class="visually-hidden">Đang tải...</span>
+                </div>
+                <p class="mt-3 text-muted">Đang tải đơn hàng...</p>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyOrders" style="display: none;">
+                <div class="card shadow-sm">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-box-open fa-4x text-muted mb-3"></i>
+                        <h4>Chưa có đơn hàng nào</h4>
+                        <p class="text-muted">Hãy khám phá và đặt hàng những sản phẩm tuyệt vời!</p>
+                        <a href="/products" class="btn beauty-primary-btn mt-3">
+                            <i class="fas fa-spa me-2"></i>Khám phá ngay
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Orders List -->
+            <div id="ordersList" style="display: none;">
+                <!-- Orders will be loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cancel Order Modal -->
+<div class="modal fade" id="cancelOrderModal" tabindex="-1" aria-labelledby="cancelOrderModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="cancelOrderModalLabel">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Xác nhận hủy đơn hàng
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center mb-3">
+                    <i class="fas fa-times-circle text-danger" style="font-size: 4rem;"></i>
+                </div>
+                <h6 class="text-center mb-3">Bạn có chắc chắn muốn hủy đơn hàng này?</h6>
+                <div class="alert alert-warning">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Lưu ý:</strong> Chỉ có thể hủy đơn hàng COD đang chờ xử lý. Hành động này không thể hoàn tác.
+                </div>
+                <div class="bg-light p-3 rounded">
+                    <p class="mb-1"><strong>Mã đơn hàng:</strong> <span id="cancelOrderNumber" class="text-primary"></span></p>
+                    <p class="mb-0"><strong>Lý do:</strong> Chỉ được hủy đơn COD</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-arrow-left me-2"></i>Quay lại
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmCancelBtn">
+                    <i class="fas fa-times me-2"></i>Xác nhận hủy
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Success Modal -->
+<div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="successModalLabel">
+                    <i class="fas fa-check-circle me-2"></i>Thành công
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <i class="fas fa-check-circle text-success" style="font-size: 5rem;"></i>
+                <h4 class="mt-3 mb-2">Đã hủy đơn hàng!</h4>
+                <p class="text-muted mb-0">Đơn hàng của bạn đã được hủy thành công.</p>
+                <p class="text-muted mt-2">
+                    <small>Tự động tải lại sau <strong><span id="countdownTimer">5</span></strong> giây...</small>
+                </p>
+            </div>
+            <div class="modal-footer justify-content-center">
+                <button type="button" class="btn btn-primary" onclick="window.location.href='/'">
+                    <i class="fas fa-home me-2"></i>Về trang chủ
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Error Modal -->
+<div class="modal fade" id="errorModal" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="errorModalLabel">
+                    <i class="fas fa-exclamation-circle me-2"></i>Lỗi
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <i class="fas fa-exclamation-circle text-danger" style="font-size: 4rem;"></i>
+                <h5 class="mt-3 mb-2">Không thể hủy đơn hàng</h5>
+                <p class="text-muted mb-0" id="errorMessage">Đã xảy ra lỗi. Vui lòng thử lại sau!</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Đóng
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Rating Modal -->
+<div class="modal fade" id="ratingModal" tabindex="-1" aria-labelledby="ratingModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title" id="ratingModalLabel">
+                    <i class="fas fa-star me-2"></i>Đánh giá sản phẩm
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center mb-3">
+                    <h6 id="ratingProductName" class="fw-bold"></h6>
+                </div>
+                <div class="text-center mb-4">
+                    <p class="mb-2">Chọn số sao:</p>
+                    <div class="star-rating" id="starRating">
+                        <i class="far fa-star star" data-rating="1"></i>
+                        <i class="far fa-star star" data-rating="2"></i>
+                        <i class="far fa-star star" data-rating="3"></i>
+                        <i class="far fa-star star" data-rating="4"></i>
+                        <i class="far fa-star star" data-rating="5"></i>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="reviewTitle">Tiêu đề</label>
+                    <input class="form-control" id="reviewTitle" maxlength="160" placeholder="Tóm tắt trải nghiệm của bạn">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="reviewContent">Nội dung đánh giá</label>
+                    <textarea class="form-control" id="reviewContent" rows="4" maxlength="3000" required></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="reviewSkinType">Loại da (tùy chọn)</label>
+                    <input class="form-control" id="reviewSkinType" maxlength="80" placeholder="Ví dụ: Da hỗn hợp, nhạy cảm">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label" for="reviewImages">Ảnh thực tế (tối đa 5 ảnh)</label>
+                    <input class="form-control" id="reviewImages" type="file" accept="image/jpeg,image/png,image/webp" multiple>
+                    <div class="form-text">JPEG, PNG hoặc WebP; tối đa 10 MB mỗi ảnh.</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Hủy
+                </button>
+                <button type="button" class="btn btn-warning" id="submitRatingBtn" disabled>
+                    <i class="fas fa-paper-plane me-2"></i>Gửi đánh giá
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.star-rating {
+    font-size: 2.5rem;
+    cursor: pointer;
+}
+.star-rating .star {
+    color: #ddd;
+    transition: color 0.2s;
+}
+.star-rating .star.active,
+.star-rating .star:hover {
+    color: #ffc107;
+}
+</style>
+
+<div th:replace="~{fragments/footer :: footer}"></div>
+
+<!-- JavaScript -->
+<script src="/js/auth.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadOrders();
+});
+
+async function loadOrders() {
+    const ordersLoading = document.getElementById('ordersLoading');
+    const emptyOrders = document.getElementById('emptyOrders');
+    const ordersList = document.getElementById('ordersList');
+
+    try {
+        const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+        const userEmail = localStorage.getItem('authEmail') || localStorage.getItem('userEmail');
+        
+        if (!token || !userEmail) {
+            window.location.href = '/login';
+            return;
+        }
+
+        const response = await fetch('/api/orders', {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            }
+        });
+
+        if (response.status === 401) {
+            window.location.href = '/login';
+            return;
+        }
+
+        if (!response.ok) {
+            throw new Error('Failed to load orders');
+        }
+
+        const orders = await response.json();
+
+        ordersLoading.style.display = 'none';
+
+        if (orders.length === 0) {
+            emptyOrders.style.display = 'block';
+        } else {
+            displayOrders(orders);
+            ordersList.style.display = 'block';
+        }
+
+    } catch (error) {
+        console.error('Error loading orders:', error);
+        ordersLoading.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-circle me-2"></i>
+                Không thể tải đơn hàng. Vui lòng thử lại.
+            </div>
+        `;
+    }
+}
+
+function displayOrders(orders) {
+    const container = document.getElementById('ordersList');
+    container.innerHTML = '';
+
+    orders.forEach(order => {
+        const orderId = safePositiveInteger(order.id);
+        const orderNumber = String(order.orderNumber || '');
+        const items = Array.isArray(order.items) ? order.items : [];
+        const orderCard = document.createElement('div');
+        orderCard.className = 'card shadow-sm mb-4';
+        orderCard.innerHTML = `
+            <div class="card-header" style="background: linear-gradient(135deg, #fff5f8 0%, #f4dce5 100%);">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <h6 class="mb-0">
+                            <i class="fas fa-receipt me-2"></i>
+                            <strong>${escapeHtml(orderNumber)}</strong>
+                        </h6>
+                        <small class="text-muted">
+                            <i class="far fa-calendar me-1"></i>
+                            ${formatDate(order.createdAt)}
+                        </small>
+                    </div>
+                    <div class="col-md-6 text-md-end">
+                        <span class="badge ${getStatusBadgeClass(order.status)} fs-6">
+                            ${getStatusText(order.status)}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <h6 class="mb-3"><i class="fas fa-box me-2"></i>Sản phẩm:</h6>
+                        ${items.map(item => `
+                            <div class="d-flex align-items-center mb-2 justify-content-between">
+                                <div class="d-flex align-items-center">
+                                    <img src="${escapeHtml(window.BeautyUI ? BeautyUI.safeUrl(item.productImageUrl) : '/images/beauty/hero-beautystore-v2.webp')}"
+                                         alt="${escapeHtml(item.productName)}"
+                                         class="rounded me-3" 
+                                         style="width: 50px; height: 50px; object-fit: cover;">
+                                    <div>
+                                        <p class="mb-0">${escapeHtml(item.productName)}</p>
+                                        ${item.variantLabel || item.shadeName || item.netContent ? `<small class="text-muted d-block">${escapeHtml([item.variantLabel, item.shadeName, item.netContent].filter(Boolean).join(' · '))}</small>` : ''}
+                                        <small class="text-muted">SL: ${Number(item.quantity) || 0} × ${formatPrice(item.price)}</small>
+                                    </div>
+                                </div>
+                                ${order.status === 'DELIVERED' ? `
+                                    <div class="review-container d-flex gap-2">
+                                        <button type="button" class="btn btn-sm btn-outline-warning review-order-item"
+                                                data-order-item-id="${safePositiveInteger(item.id)}"
+                                                data-product-name="${escapeHtml(item.productName)}">
+                                            <i class="far fa-star me-1"></i>Viết đánh giá
+                                        </button>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="col-md-4 text-md-end">
+                        ${order.voucherCode ? `
+                            <p class="text-muted mb-1">Mã giảm giá: <span class="badge bg-success">${escapeHtml(order.voucherCode)}</span></p>
+                            <p class="text-success mb-1">Giảm: -${formatPrice(order.voucherDiscount || 0)}</p>
+                        ` : ''}
+                        <p class="text-muted mb-1">Tổng tiền:</p>
+                        <h4 class="text-danger mb-3">${formatPrice(order.totalAmount)}</h4>
+                        <div class="d-flex gap-2 justify-content-md-end">
+                            <a href="/order-confirmation/${escapeHtml(encodeURIComponent(orderNumber))}" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-eye me-1"></i>Chi tiết
+                            </a>
+                            ${canCancelOrder(order) ? `
+                                <button type="button" class="btn btn-outline-danger btn-sm cancel-order-button"
+                                        data-order-id="${orderId}" data-order-number="${escapeHtml(orderNumber)}">
+                                    <i class="fas fa-times me-1"></i>Hủy đơn
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        container.appendChild(orderCard);
+    });
+    
+    container.querySelectorAll('.review-order-item').forEach(button => {
+        button.addEventListener('click', () => openReviewModal(
+            Number(button.dataset.orderItemId), button.dataset.productName || 'Sản phẩm'));
+    });
+    container.querySelectorAll('.cancel-order-button').forEach(button => {
+        button.addEventListener('click', () => cancelOrder(
+            safePositiveInteger(button.dataset.orderId), button.dataset.orderNumber || ''));
+    });
+}
+
+function canCancelOrder(order) {
+    // Only allow cancellation for PENDING orders with COD payment
+    return order.status === 'PENDING' && order.paymentMethod === 'COD';
+}
+
+function getStatusBadgeClass(status) {
+    const classes = {
+        'PENDING_PAYMENT': 'bg-warning',
+        'PENDING': 'bg-warning',
+        'CONFIRMED': 'bg-info',
+        'PROCESSING': 'bg-primary',
+        'SHIPPING': 'bg-primary',
+        'DELIVERED': 'bg-success',
+        'CANCELLED': 'bg-danger',
+        'REFUNDED': 'bg-secondary'
+    };
+    return classes[status] || 'bg-secondary';
+}
+
+function getStatusText(status) {
+    const texts = {
+        'PENDING_PAYMENT': '💳 Chờ thanh toán',
+        'PENDING': '⏳ Chờ xử lý',
+        'CONFIRMED': '✅ Đã xác nhận',
+        'PROCESSING': '📦 Đang xử lý',
+        'SHIPPING': '🚚 Đang giao hàng',
+        'DELIVERED': '✨ Đã giao hàng',
+        'CANCELLED': '❌ Đã hủy',
+        'REFUNDED': '💰 Đã hoàn tiền'
+    };
+    return texts[status] || 'Không xác định';
+}
+
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
+
+function safePositiveInteger(value) {
+    const number = Number(value);
+    return Number.isSafeInteger(number) && number > 0 ? number : 0;
+}
+
+function formatPrice(price) {
+    return new Intl.NumberFormat('vi-VN', { 
+        style: 'currency', 
+        currency: 'VND' 
+    }).format(price);
+}
+
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('vi-VN', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+let currentCancelOrderId = null;
+let currentCancelOrderNumber = null;
+
+function cancelOrder(orderId, orderNumber) {
+    // Store order info
+    currentCancelOrderId = safePositiveInteger(orderId);
+    currentCancelOrderNumber = String(orderNumber || '');
+    
+    // Update modal content
+    document.getElementById('cancelOrderNumber').textContent = currentCancelOrderNumber;
+    
+    // Show cancel confirmation modal
+    const cancelModal = new bootstrap.Modal(document.getElementById('cancelOrderModal'));
+    cancelModal.show();
+}
+
+// Confirm cancel button click handler
+document.addEventListener('DOMContentLoaded', function() {
+    const confirmCancelBtn = document.getElementById('confirmCancelBtn');
+    if (confirmCancelBtn) {
+        confirmCancelBtn.addEventListener('click', async function() {
+            // Hide cancel modal
+            const cancelModal = bootstrap.Modal.getInstance(document.getElementById('cancelOrderModal'));
+            cancelModal.hide();
+            
+            // Show loading state
+            confirmCancelBtn.disabled = true;
+            confirmCancelBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang xử lý...';
+            
+            await performCancelOrder();
+            
+            // Reset button
+            confirmCancelBtn.disabled = false;
+            confirmCancelBtn.innerHTML = '<i class="fas fa-times me-2"></i>Xác nhận hủy';
+        });
+    }
+});
+
+async function performCancelOrder() {
+    try {
+        const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+        const userEmail = localStorage.getItem('authEmail') || localStorage.getItem('userEmail');
+        
+        if (!token || !userEmail) {
+            showErrorModal('Vui lòng đăng nhập để hủy đơn hàng!');
+            setTimeout(() => window.location.href = '/login', 2000);
+            return;
+        }
+
+        const response = await fetch(`/api/orders/${currentCancelOrderId}/cancel`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            }
+        });
+
+        if (response.status === 401) {
+            showErrorModal('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!');
+            setTimeout(() => window.location.href = '/login', 2000);
+            return;
+        }
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            showErrorModal(data.error || 'Không thể hủy đơn hàng. Vui lòng thử lại!');
+            return;
+        }
+
+        // Show success modal
+        const successModal = new bootstrap.Modal(document.getElementById('successModal'));
+        successModal.show();
+        
+        // Start countdown timer
+        startCountdown(5);
+
+    } catch (error) {
+        console.error('Error cancelling order:', error);
+        showErrorModal('Đã xảy ra lỗi khi hủy đơn hàng. Vui lòng thử lại sau!');
+    }
+}
+
+function startCountdown(seconds) {
+    let timeLeft = seconds;
+    const timerElement = document.getElementById('countdownTimer');
+    
+    const countdown = setInterval(() => {
+        timeLeft--;
+        if (timerElement) {
+            timerElement.textContent = timeLeft;
+        }
+        
+        if (timeLeft <= 0) {
+            clearInterval(countdown);
+            reloadOrdersNow();
+        }
+    }, 1000);
+}
+
+function reloadOrdersNow() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('successModal'));
+    if (modal) modal.hide();
+    loadOrders();
+}
+
+function showErrorModal(message) {
+    document.getElementById('errorMessage').textContent = message;
+    const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
+    errorModal.show();
+}
+
+// ===== RATING FUNCTIONS =====
+
+let currentReviewOrderItemId = null;
+let selectedStars = 0;
+
+function openReviewModal(orderItemId, productName) {
+    currentReviewOrderItemId = safePositiveInteger(orderItemId);
+    selectedStars = 0;
+    
+    document.getElementById('ratingProductName').textContent = productName;
+    document.getElementById('submitRatingBtn').disabled = true;
+    document.getElementById('reviewTitle').value = '';
+    document.getElementById('reviewContent').value = '';
+    document.getElementById('reviewSkinType').value = '';
+    document.getElementById('reviewImages').value = '';
+    
+    // Reset stars
+    const stars = document.querySelectorAll('.star-rating .star');
+    stars.forEach(star => {
+        star.classList.remove('active', 'fas');
+        star.classList.add('far');
+    });
+    
+    // Show modal
+    const ratingModal = new bootstrap.Modal(document.getElementById('ratingModal'));
+    ratingModal.show();
+    
+    // Add star click handlers
+    setupStarRating();
+}
+
+function setupStarRating() {
+    const stars = document.querySelectorAll('.star-rating .star');
+    
+    stars.forEach(star => {
+        star.addEventListener('click', function() {
+            selectedStars = parseInt(this.getAttribute('data-rating'));
+            updateStarDisplay(selectedStars);
+            document.getElementById('submitRatingBtn').disabled = false;
+        });
+        
+        star.addEventListener('mouseenter', function() {
+            const rating = parseInt(this.getAttribute('data-rating'));
+            updateStarDisplay(rating);
+        });
+    });
+    
+    document.getElementById('starRating').addEventListener('mouseleave', function() {
+        updateStarDisplay(selectedStars);
+    });
+}
+
+function updateStarDisplay(rating) {
+    const stars = document.querySelectorAll('.star-rating .star');
+    stars.forEach((star, index) => {
+        if (index < rating) {
+            star.classList.remove('far');
+            star.classList.add('fas', 'active');
+        } else {
+            star.classList.remove('fas', 'active');
+            star.classList.add('far');
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const submitRatingBtn = document.getElementById('submitRatingBtn');
+    if (submitRatingBtn) {
+        submitRatingBtn.addEventListener('click', submitReview);
+    }
+});
+
+async function submitReview() {
+    if (selectedStars === 0) {
+        showErrorModal('Vui lòng chọn số sao đánh giá!');
+        return;
+    }
+    
+    const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+    if (!token) {
+        showErrorModal('Vui lòng đăng nhập để đánh giá!');
+        setTimeout(() => window.location.href = '/login', 2000);
+        return;
+    }
+    
+    const submitBtn = document.getElementById('submitRatingBtn');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang gửi...';
+    
+    try {
+        const files = Array.from(document.getElementById('reviewImages').files || []);
+        if (files.length > 5) throw new Error('Mỗi đánh giá có tối đa 5 ảnh.');
+        const imageUrls = [];
+        for (const file of files) {
+            const formData = new FormData();
+            formData.append('orderItemId', String(currentReviewOrderItemId));
+            formData.append('image', file);
+            const upload = await fetch('/api/uploads/review', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+            const uploaded = await upload.json().catch(() => ({}));
+            if (!upload.ok || !uploaded.url) {
+                throw new Error(uploaded.message || 'Không thể tải ảnh đánh giá.');
+            }
+            imageUrls.push(uploaded.url);
+        }
+
+        const response = await fetch('/api/reviews', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                orderItemId: currentReviewOrderItemId,
+                stars: selectedStars,
+                title: document.getElementById('reviewTitle').value.trim(),
+                content: document.getElementById('reviewContent').value.trim(),
+                skinType: document.getElementById('reviewSkinType').value.trim(),
+                imageUrls
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.message || data.error || 'Không thể gửi đánh giá');
+        }
+        
+        // Close modal
+        const ratingModal = bootstrap.Modal.getInstance(document.getElementById('ratingModal'));
+        ratingModal.hide();
+        
+        const reviewedButton = document.querySelector(
+            `.review-order-item[data-order-item-id="${currentReviewOrderItemId}"]`);
+        if (reviewedButton) {
+            reviewedButton.disabled = true;
+            reviewedButton.textContent = 'Đã gửi, chờ duyệt';
+        }
+        
+        // Show success notification
+        showSuccessNotification('Cảm ơn bạn đã đánh giá! ⭐');
+        
+    } catch (error) {
+        console.error('Error submitting rating:', error);
+        showErrorModal(error.message || 'Không thể gửi đánh giá. Vui lòng thử lại!');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-paper-plane me-2"></i>Gửi đánh giá';
+    }
+}
+
+function showSuccessNotification(message) {
+    const notification = document.createElement('div');
+    notification.className = 'alert alert-success alert-dismissible fade show position-fixed';
+    notification.style.cssText = 'top: 80px; right: 20px; z-index: 9999; min-width: 300px;';
+    const icon = document.createElement('i');
+    icon.className = 'fas fa-check-circle me-2';
+    icon.setAttribute('aria-hidden', 'true');
+    const text = document.createElement('span');
+    text.textContent = String(message || '');
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'btn-close';
+    close.setAttribute('data-bs-dismiss', 'alert');
+    close.setAttribute('aria-label', 'Đóng');
+    notification.append(icon, text, close);
+    document.body.appendChild(notification);
+    
+    setTimeout(() => notification.remove(), 3000);
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/header :: head(title='Chi tiết sản phẩm – BeautyStore')}"></head>
+<body>
+<div th:replace="~{fragments/header :: header}"></div>
+
+<main id="main-content">
+    <section class="bg-light py-3">
+        <div class="container">
+            <nav aria-label="Đường dẫn trang">
+                <ol class="breadcrumb mb-0" id="productBreadcrumb">
+                    <li class="breadcrumb-item"><a href="/">Trang chủ</a></li>
+                    <li class="breadcrumb-item"><a href="/products">Mỹ phẩm</a></li>
+                    <li class="breadcrumb-item active" aria-current="page" id="breadcrumbProduct"
+                        th:text="${seoProduct != null ? seoProduct.name : 'Chi tiết'}">Chi tiết</li>
+                </ol>
+            </nav>
+        </div>
+    </section>
+
+    <div class="container py-5">
+        <div id="productDetailContainer" aria-live="polite" aria-busy="false">
+            <!-- Nội dung quan trọng được render ở server cho SEO; JavaScript chỉ progressive-enhance gallery/variant/review. -->
+            <article th:if="${seoProduct != null}" class="row g-5 mx-0">
+                <div class="col-lg-6">
+                    <div class="beauty-card product-gallery-frame p-3">
+                        <img class="w-100 rounded-4"
+                             th:src="${!#lists.isEmpty(seoProduct.gallery) ? seoProduct.gallery[0].url : (!#lists.isEmpty(seoProduct.variants) and !#strings.isEmpty(seoProduct.variants[0].imageUrl) ? seoProduct.variants[0].imageUrl : '/images/beauty/hero-beautystore-v2.webp')}"
+                             th:alt="${seoProduct.name}" style="aspect-ratio:1/1;object-fit:contain">
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <p class="beauty-eyebrow mb-1" th:text="${seoProduct.brandName}">Thương hiệu</p>
+                    <h1 class="beauty-heading display-5 fw-bold mt-2 mb-3" th:text="${seoProduct.name}">Sản phẩm</h1>
+                    <p class="lead text-muted"
+                       th:text="${!#strings.isEmpty(seoProduct.benefits) ? seoProduct.benefits : seoProduct.description}"></p>
+                    <p class="display-6 fw-bold text-danger"
+                       th:text="${#numbers.formatDecimal(seoProduct.minPrice, 0, 'POINT', 0, 'COMMA') + (seoProduct.maxPrice != null and seoProduct.maxPrice.compareTo(seoProduct.minPrice) != 0 ? ' – ' + #numbers.formatDecimal(seoProduct.maxPrice, 0, 'POINT', 0, 'COMMA') : '') + '₫'}">
+                        0₫
+                    </p>
+                    <p th:classappend="${seoProduct.inStock ? 'text-success' : 'text-danger'}"
+                       th:text="${seoProduct.inStock ? 'Còn hàng' : 'Tạm hết hàng'}">Còn hàng</p>
+                    <div class="d-flex flex-wrap gap-2" th:if="${!#lists.isEmpty(seoProduct.variants)}">
+                        <span class="beauty-pill" th:each="variant : ${seoProduct.variants}"
+                              th:text="${!#strings.isEmpty(variant.label) ? variant.label : variant.sku}">Phân loại</span>
+                    </div>
+                </div>
+            </article>
+            <section th:if="${seoProduct != null}" class="mt-5" aria-labelledby="serverDetailsTitle">
+                <h2 id="serverDetailsTitle" class="beauty-heading fw-bold mb-4">Thông tin sản phẩm</h2>
+                <div class="row g-4">
+                    <article class="col-md-6" th:if="${!#strings.isEmpty(seoProduct.inci)}">
+                        <div class="beauty-card p-4 h-100"><h3 class="h5">Thành phần (INCI)</h3><p class="text-muted mb-0" th:text="${seoProduct.inci}"></p></div>
+                    </article>
+                    <article class="col-md-6" th:if="${!#strings.isEmpty(seoProduct.directions)}">
+                        <div class="beauty-card p-4 h-100"><h3 class="h5">Cách sử dụng</h3><p class="text-muted mb-0" th:text="${seoProduct.directions}"></p></div>
+                    </article>
+                    <article class="col-md-6" th:if="${!#strings.isEmpty(seoProduct.warnings)}">
+                        <div class="beauty-card p-4 h-100"><h3 class="h5">Cảnh báo</h3><p class="text-muted mb-0" th:text="${seoProduct.warnings}"></p></div>
+                    </article>
+                    <article class="col-md-6" th:if="${!#strings.isEmpty(seoProduct.origin)}">
+                        <div class="beauty-card p-4 h-100"><h3 class="h5">Xuất xứ</h3><p class="text-muted mb-0" th:text="${seoProduct.origin}"></p></div>
+                    </article>
+                </div>
+            </section>
+            <div th:unless="${seoProduct != null}" class="text-center py-5"><span class="spinner-border text-danger" aria-hidden="true"></span><p class="mt-3 text-muted">Đang tải thông tin sản phẩm...</p></div>
+        </div>
+
+        <section class="mt-5 pt-4 border-top" aria-labelledby="relatedTitle">
+            <p class="beauty-eyebrow">Khám phá thêm</p>
+            <h2 class="beauty-heading fw-bold mb-4" id="relatedTitle">Có thể bạn cũng yêu thích</h2>
+            <div id="relatedProducts" class="row g-4" aria-live="polite"></div>
+        </section>
+    </div>
+</main>
+
+<script type="application/ld+json" id="productStructuredData" th:utext="${productJsonLd}">{}</script>
+<div th:replace="~{fragments/footer :: footer}"></div>
+<script th:src="@{/js/auth.js}"></script>
+<script th:src="@{/js/product-detail.js(v=4.0)}" defer></script>
+</body>
+</html>

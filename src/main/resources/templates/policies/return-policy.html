@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/header :: head(title='Chính sách đổi trả - BeautyStore')}">
+</head>
+<body>
+    <div th:replace="~{fragments/header :: header}"></div>
+
+    <div class="container my-5" id="main-content">
+        <div class="row">
+            <div class="col-lg-10 mx-auto">
+                <!-- Header -->
+                <div class="text-center mb-5">
+                    <h1 class="display-4 fw-bold mb-3">
+                        Chính sách đổi trả
+                    </h1>
+                    <p class="lead text-muted">Quy trình đổi trả đơn giản và nhanh chóng</p>
+                    <small class="text-muted">Cập nhật lần cuối: 09/09/2026</small>
+                </div>
+
+                <!-- Content -->
+                <div class="card shadow-lg border-0 mb-4">
+                    <div class="card-body p-5">
+                        <h3 class="text-info mb-4">1. Thời gian đổi trả</h3>
+                        <div class="alert alert-info">
+                            <h5 class="alert-heading">Chính sách 7 ngày</h5>
+                            <p class="mb-0">Quý khách có thể yêu cầu đổi sản phẩm còn nguyên niêm phong trong vòng <strong>7 ngày</strong> kể từ ngày nhận hàng. Hàng sai, lỗi hoặc hư hỏng cần được báo trong <strong>48 giờ</strong>.</p>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <h3 class="text-info mb-4">2. Điều kiện đổi trả</h3>
+                        <p>Sản phẩm được chấp nhận đổi trả khi:</p>
+                        <ul class="list-group list-group-flush mb-4">
+                            <li class="list-group-item">
+                                Còn nguyên niêm phong, chưa mở và chưa qua sử dụng
+                            </li>
+                            <li class="list-group-item">
+                                Còn đầy đủ hộp, tem, phụ kiện
+                            </li>
+                            <li class="list-group-item">
+                                Có mã đơn hàng hoặc bằng chứng mua hàng tại BeautyStore
+                            </li>
+                            <li class="list-group-item">
+                                Không có dấu hiệu hư hỏng do sử dụng
+                            </li>
+                        </ul>
+
+                        <hr class="my-4">
+
+                        <h3 class="text-info mb-4">3. Trường hợp không được đổi trả</h3>
+                        <ul class="list-group list-group-flush mb-4">
+                            <li class="list-group-item text-danger">
+                                Sản phẩm đã mở niêm phong hoặc đã qua sử dụng, trừ trường hợp lỗi được xác nhận
+                            </li>
+                            <li class="list-group-item text-danger">
+                                Mất tem, mác, phụ kiện đi kèm
+                            </li>
+                            <li class="list-group-item text-danger">
+                                Quá thời hạn 7 ngày
+                            </li>
+                            <li class="list-group-item text-danger">
+                                Yêu cầu đổi vì không hợp màu hoặc kích ứng sau khi sản phẩm đã mở
+                            </li>
+                        </ul>
+
+                        <hr class="my-4">
+
+                        <h3 class="text-info mb-4">4. Quy trình đổi trả</h3>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-3">
+                                <div class="card text-center h-100">
+                                    <div class="card-body">
+                                        <div class="display-4 text-info mb-3">1</div>
+                                        <h5>Liên hệ</h5>
+                                        <p class="small">Gọi hotline hoặc gửi email yêu cầu đổi trả</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-center h-100">
+                                    <div class="card-body">
+                                        <div class="display-4 text-info mb-3">2</div>
+                                        <h5>Xác nhận</h5>
+                                        <p class="small">BeautyStore kiểm tra điều kiện và xác nhận</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-center h-100">
+                                    <div class="card-body">
+                                        <div class="display-4 text-info mb-3">3</div>
+                                        <h5>Gửi hàng</h5>
+                                        <p class="small">Đóng gói và gửi về địa chỉ BeautyStore</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-center h-100">
+                                    <div class="card-body">
+                                        <div class="display-4 text-info mb-3">4</div>
+                                        <h5>Hoàn tiền</h5>
+                                        <p class="small">Được xử lý thủ công sau khi kiểm tra hàng trả</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <h3 class="text-info mb-4">5. Hoàn tiền</h3>
+                        <p>Sau khi nhận và kiểm tra hàng đổi trả, BeautyStore sẽ xác nhận phương thức hoàn tiền phù hợp với khách hàng.</p>
+                        <ul class="mb-4">
+                            <li>Phiên bản hiện tại không tự động gọi API hoàn tiền VNPay.</li>
+                            <li>Nhân viên quản trị ghi nhận thủ công mã tham chiếu và trạng thái xử lý.</li>
+                            <li>Thời gian nhận tiền phụ thuộc phương thức được hai bên xác nhận và đơn vị thanh toán.</li>
+                        </ul>
+                        <div class="alert alert-warning">
+                            <strong>Lưu ý:</strong> Chi phí vận chuyển đổi trả do khách hàng chịu, trừ trường hợp giao sai, lỗi hoặc hư hỏng do BeautyStore.
+                        </div>
+
+                        <hr class="my-4">
+
+                        <h3 class="text-info mb-4">6. Đổi hàng</h3>
+                        <p>Nếu muốn đổi sang sản phẩm khác:</p>
+                        <ul>
+                            <li>Sản phẩm mới có giá trị bằng hoặc cao hơn: Bù thêm tiền chênh lệch</li>
+                            <li>Sản phẩm mới có giá trị thấp hơn: Hoàn lại tiền chênh lệch</li>
+                            <li>Áp dụng cùng điều kiện đổi trả như trên</li>
+                        </ul>
+
+                        <hr class="my-4">
+
+                        <h3 class="text-info mb-4">7. Liên hệ đổi trả</h3>
+                        <div class="bg-light p-4 rounded">
+                            <p class="mb-2"><strong>Hotline:</strong> <span th:text="${@storeProperties.hotline}">1800-8080</span></p>
+                            <p class="mb-2"><strong>Email:</strong> <span th:text="${@storeProperties.supportEmail}">support@beautystore.vn</span></p>
+                            <p class="mb-2"><strong>Địa chỉ trả hàng:</strong>
+                                <span th:text="${#strings.isEmpty(@storeProperties.legalAddress) ? 'Liên hệ trước qua email hoặc hotline để nhận địa chỉ trả hàng' : @storeProperties.legalAddress}">Liên hệ trước qua email hoặc hotline để nhận địa chỉ trả hàng</span>
+                            </p>
+                            <p class="mb-0"><strong>Giờ làm việc:</strong> 8:00 - 21:00 (Thứ 2 - Chủ nhật)</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Back button -->
+                <div class="text-center">
+                    <a href="/" class="btn btn-info btn-lg">
+                        Quay về trang chủ
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div th:replace="~{fragments/footer :: footer}"></div>
+
+    <script th:src="@{/js/auth.js}"></script>
+</body>
+</html>

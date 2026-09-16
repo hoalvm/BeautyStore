@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head(title)">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${seoProduct != null ? seoProduct.name + ' – ' + @storeProperties.name : title}">BeautyStore</title>
+    <meta name="description"
+          th:content="${seoProduct != null ? (!#strings.isEmpty(seoProduct.benefits) ? seoProduct.benefits : seoProduct.description) : 'BeautyStore - Mỹ phẩm chăm sóc da, trang điểm và chăm sóc cá nhân được tuyển chọn cho khách hàng Việt Nam.'}">
+    <meta name="theme-color" content="#7b294c">
+    <link rel="icon" type="image/svg+xml" th:href="@{/images/beauty/favicon.svg}">
+    <meta property="og:site_name" content="BeautyStore">
+    <meta property="og:type" th:content="${seoProduct != null ? 'product' : 'website'}" content="website">
+    <meta property="og:locale" content="vi_VN">
+    <meta property="og:title" th:if="${seoProduct != null}" th:content="${seoProduct.name}">
+    <meta property="og:description" th:if="${seoProduct != null}"
+          th:content="${!#strings.isEmpty(seoProduct.benefits) ? seoProduct.benefits : seoProduct.description}">
+    <meta property="og:image" th:if="${seoProduct != null and !#lists.isEmpty(seoProduct.gallery)}"
+          th:content="${seoProduct.gallery[0].url}">
+    <meta property="og:url" th:if="${canonicalUrl != null}" th:content="${canonicalUrl}">
+    <link rel="canonical" th:if="${canonicalUrl != null}" th:href="${canonicalUrl}">
+    <meta name="ctx" th:content="@{/}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <script th:src="@{/js/beauty-ui.js}" defer></script>
+</head>
+
+<header th:fragment="header" class="header-section">
+    <a class="skip-link" href="#main-content">Chuyển đến nội dung chính</a>
+    <div class="top-bar text-white py-2">
+        <div class="container d-flex flex-wrap justify-content-between gap-2">
+            <small><i class="fas fa-phone-volume me-2" aria-hidden="true"></i><span th:text="${'Hotline: ' + @storeProperties.hotline}">Hotline: 1800-8080</span></small>
+            <small><i class="fas fa-truck-fast me-2" aria-hidden="true"></i><span th:text="${'Miễn phí giao hàng cho đơn từ ' + #numbers.formatDecimal(@storeProperties.freeShippingThreshold, 0, 'POINT', 0, 'COMMA') + '₫'}">Miễn phí giao hàng cho đơn từ 500.000₫</span></small>
+        </div>
+    </div>
+
+    <nav class="navbar navbar-expand-lg navbar-light bg-white py-3 shadow-sm" aria-label="Điều hướng chính">
+        <div class="container">
+            <a class="navbar-brand fw-bold beauty-gradient-text" th:href="@{/}" aria-label="BeautyStore - Trang chủ">
+                <i class="fas fa-spa me-2 brand-icon" aria-hidden="true"></i><span th:text="${@storeProperties.name}">BeautyStore</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                    aria-controls="navbarNav" aria-expanded="false" aria-label="Mở menu">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <div class="search-section flex-grow-1 mx-4" role="search">
+                    <label for="searchInput" class="visually-hidden">Tìm sản phẩm</label>
+                    <div class="input-group">
+                        <input type="search" class="form-control" placeholder="Tìm mỹ phẩm, thương hiệu, thành phần..."
+                               id="searchInput" autocomplete="off">
+                        <button class="btn btn-danger" type="button" id="searchBtn" aria-label="Tìm kiếm">
+                            <i class="fas fa-search" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="user-actions d-flex align-items-center">
+                <a th:href="@{/favorites}" class="btn btn-link text-danger me-1" aria-label="Sản phẩm yêu thích">
+                    <i class="far fa-heart" aria-hidden="true"></i>
+                </a>
+                <a th:href="@{/cart}" class="btn cart-btn text-white me-3" id="cartBtn" aria-label="Giỏ hàng">
+                    <i class="fas fa-shopping-bag" aria-hidden="true"></i>
+                    <span class="badge bg-danger ms-1" id="cartBadge" aria-label="Số sản phẩm trong giỏ">0</span>
+                </a>
+                <div class="auth-buttons" id="authButtons">
+                    <a th:href="@{/login}" class="btn beauty-primary-btn"><i class="fas fa-sign-in-alt me-1" aria-hidden="true"></i>Đăng nhập</a>
+                </div>
+                <div class="user-menu d-none" id="userMenu">
+                    <div class="dropdown">
+                        <button class="btn beauty-primary-btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"><span id="userName">Tài khoản</span></button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" th:href="@{/profile}"><i class="fas fa-user me-2"></i>Hồ sơ của tôi</a></li>
+                            <li><a class="dropdown-item" th:href="@{/orders}"><i class="fas fa-receipt me-2"></i>Đơn hàng của tôi</a></li>
+                            <li><a class="dropdown-item" th:href="@{/favorites}"><i class="fas fa-heart me-2 text-danger"></i>Yêu thích</a></li>
+                            <li id="dashboardMenuDivider" class="d-none"><hr class="dropdown-divider"></li>
+                            <li id="adminDashboardLink" class="d-none"><a class="dropdown-item text-primary fw-bold" th:href="@{/admin}"><i class="fas fa-shield-alt me-2"></i>Quản trị</a></li>
+                            <li id="shipperDashboardLink" class="d-none"><a class="dropdown-item text-success fw-bold" th:href="@{/shipper}"><i class="fas fa-truck me-2"></i>Giao vận</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" id="logoutLink"><i class="fas fa-sign-out-alt me-2"></i>Đăng xuất</a></li>
+                        </ul>
+                    </div>
+                </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="category-nav beauty-nav-bg py-2" aria-label="Danh mục mỹ phẩm">
+        <div class="container">
+            <ul class="navbar-nav d-flex flex-row flex-nowrap overflow-auto" id="categoryNavigation">
+                <li class="nav-item"><a class="nav-link text-white fw-semibold px-2 px-lg-3" th:href="@{/}"><i class="fas fa-home me-1"></i>Trang chủ</a></li>
+                <li class="nav-item"><a class="nav-link text-white fw-semibold px-2 px-lg-3" th:href="@{/products}"><i class="fas fa-store me-1"></i>Tất cả sản phẩm</a></li>
+                <li class="nav-item" id="headerCategoryLoading"><span class="nav-link text-white-50 px-2 px-lg-3"><span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Danh mục</span></li>
+            </ul>
+        </div>
+    </nav>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const searchInput = document.getElementById('searchInput');
+            const performSearch = () => {
+                const keyword = searchInput?.value.trim();
+                window.location.href = keyword ? `/products?search=${encodeURIComponent(keyword)}` : '/products';
+            };
+            document.getElementById('searchBtn')?.addEventListener('click', performSearch);
+            searchInput?.addEventListener('keydown', event => {
+                if (event.key === 'Enter') { event.preventDefault(); performSearch(); }
+            });
+
+            const navigation = document.getElementById('categoryNavigation');
+            const loading = document.getElementById('headerCategoryLoading');
+            if (!navigation || !loading) return;
+            fetch('/api/products/categories')
+                .then(response => response.ok ? response.json() : Promise.reject(new Error('category request failed')))
+                .then(payload => {
+                    const categories = Array.isArray(payload) ? payload : (payload.content || []);
+                    loading.remove();
+                    categories.filter(category => category?.active !== false && !category?.parentId).slice(0, 8).forEach(category => {
+                        const item = document.createElement('li');
+                        item.className = 'nav-item';
+                        const link = document.createElement('a');
+                        link.className = 'nav-link text-white fw-semibold px-2 px-lg-3';
+                        link.href = `/products?category=${encodeURIComponent(category.slug || category.id)}`;
+                        link.textContent = category.name || 'Danh mục';
+                        item.appendChild(link);
+                        navigation.appendChild(item);
+                    });
+                })
+                .catch(() => {
+                    loading.replaceChildren();
+                    const link = document.createElement('a');
+                    link.className = 'nav-link text-white fw-semibold px-2 px-lg-3';
+                    link.href = '/products';
+                    link.textContent = 'Khám phá mỹ phẩm';
+                    loading.appendChild(link);
+                });
+        });
+    </script>
+</header>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</html>

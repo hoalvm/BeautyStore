@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BeautyStore - Thông báo</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f8f9fa;">
+    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8f9fa;">
+        <tr>
+            <td align="center" style="padding: 20px;">
+                <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="padding: 20px; text-align: center; background: linear-gradient(135deg, #a93f68 0%, #4c263b 100%); color: #ffffff; border-radius: 8px 8px 0 0;">
+                            <h1 style="margin: 0; font-size: 24px;">
+                                BeautyStore - Mỹ phẩm &amp; chăm sóc cá nhân
+                            </h1>
+                        </td>
+                    </tr>
+                    <!-- Body -->
+                    <tr>
+                        <td style="padding: 30px;">
+                            <div th:replace="${bodyContent}"></div>
+                        </td>
+                    </tr>
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 20px; text-align: center; background-color: #343a40; color: #ffffff; border-radius: 0 0 8px 8px;">
+                            <p style="margin: 0 0 10px 0; font-size: 14px;">© 2026 BeautyStore. Tất cả quyền được bảo lưu.</p>
+                            <p style="margin: 0 0 10px 0; font-size: 14px;">
+                                Hotline: <span th:text="${@storeProperties.hotline}">1800-8080</span> | Email: <span th:text="${@storeProperties.supportEmail}">support@beautystore.vn</span>
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

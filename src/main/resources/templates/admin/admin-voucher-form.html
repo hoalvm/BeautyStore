@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quản lý mã giảm giá – BeautyStore</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <style>
+    body { background-color: #f8f9fa; }
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%);
+      box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    }
+    .sidebar .nav-link {
+      font-weight: 500;
+      color: #ecf0f1;
+      padding: 0.75rem 1rem;
+      transition: all 0.3s ease;
+      border-left: 3px solid transparent;
+    }
+    .sidebar .nav-link:hover {
+      color: #fff;
+      background-color: rgba(255, 255, 255, 0.1);
+      border-left-color: #3498db;
+      transform: translateX(5px);
+    }
+    .sidebar .nav-link.active {
+      color: #fff;
+      background-color: rgba(52, 152, 219, 0.3);
+      border-left: 3px solid #3498db;
+      font-weight: 600;
+    }
+    .sidebar .nav-link i { width: 20px; }
+    .sidebar-heading {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .admin-profile {
+      padding: 1rem;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+    }
+    .profile-avatar {
+      width: 60px;
+      height: 60px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .form-section {
+      background: white;
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      margin-bottom: 2rem;
+    }
+    .form-section-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #2c3e50;
+      margin-bottom: 1.5rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid #e9ecef;
+    }
+    .scope-select { min-height: 11rem; }
+    .scope-help { line-height: 1.55; }
+  </style>
+</head>
+<body>
+  <!-- Mobile Menu Toggle -->
+  <button class="btn btn-dark d-md-none mobile-menu-toggle" type="button" data-bs-toggle="offcanvas" data-bs-target="#adminSidebar">
+    <i class="fas fa-bars"></i>
+  </button>
+
+  <div class="container-fluid">
+    <div class="row">
+      <!-- Sidebar -->
+      <nav class="col-md-3 col-lg-2 d-md-block sidebar offcanvas-md offcanvas-start" id="adminSidebar" style="min-height: 100vh">
+        <div class="offcanvas-header d-md-none">
+          <h5 class="offcanvas-title text-white">Menu Admin</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#adminSidebar"></button>
+        </div>
+        <div class="position-sticky pt-3">
+          <!-- Admin Profile -->
+          <div class="admin-profile text-center mb-4 px-3">
+            <div class="profile-avatar mb-2">
+              <i class="fas fa-user-shield fa-3x text-white"></i>
+            </div>
+            <h6 class="text-white mb-0" id="adminName">admin</h6>
+            <small class="text-white-50" id="adminEmail">admin@beautystore.vn</small>
+          </div>
+
+          <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1">
+            <span class="text-white-50">📊 QUẢN TRỊ</span>
+          </h6>
+          <ul class="nav flex-column">
+            <li class="nav-item">
+              <a class="nav-link" href="/admin"><i class="fas fa-home me-2"></i>Dashboard</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/admin/products"><i class="fas fa-box me-2"></i>Quản lý sản phẩm</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/admin/orders"><i class="fas fa-shopping-cart me-2"></i>Quản lý đơn hàng</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/admin/accounts"><i class="fas fa-users me-2"></i>Quản lý tài khoản</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/admin/reviews"><i class="fas fa-star me-2"></i>Quản lý đánh giá</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/admin/returns"><i class="fas fa-arrow-rotate-left me-2"></i>Quản lý đổi trả</a>
+            </li>
+          </ul>
+
+          <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1">
+            <span class="text-white-50">🎯 MARKETING</span>
+          </h6>
+          <ul class="nav flex-column">
+            <li class="nav-item">
+              <a class="nav-link active" href="/admin/vouchers"><i class="fas fa-ticket-alt me-2"></i>Mã giảm giá</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/admin/support"><i class="fas fa-comments me-2"></i>Hỗ trợ khách hàng</a>
+            </li>
+          </ul>
+
+          <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1">
+            <span class="text-white-50">⚙️ HỆ THỐNG</span>
+          </h6>
+          <ul class="nav flex-column mb-2">
+            <li class="nav-item">
+              <a class="nav-link" href="#" id="logoutLink"><i class="fas fa-sign-out-alt me-2"></i>Đăng xuất</a>
+            </li>
+          </ul>
+        </div>
+      </nav>
+
+      <!-- Main content -->
+      <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <h1 class="h2" id="pageTitle">🎫 Tạo mã giảm giá mới</h1>
+          <a href="/admin/vouchers" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Quay lại
+          </a>
+        </div>
+
+        <form id="voucherForm">
+          <!-- Basic Information -->
+          <div class="form-section">
+            <h5 class="form-section-title"><i class="fas fa-info-circle me-2"></i>Thông tin cơ bản</h5>
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Mã giảm giá <span class="text-danger">*</span></label>
+                <div class="input-group">
+                  <input type="text" class="form-control" id="code" required 
+                         pattern="[A-Z0-9]+" title="Chỉ chữ in hoa và số"
+                         placeholder="VD: SALE50" />
+                  <button type="button" class="btn btn-outline-secondary" id="generateCodeBtn">
+                    <i class="fas fa-random"></i> Tạo tự động
+                  </button>
+                </div>
+                <small class="form-text text-muted">Chỉ sử dụng chữ in hoa và số</small>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Trạng thái</label>
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="active" checked />
+                  <label class="form-check-label" for="active">Kích hoạt ngay</label>
+                </div>
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Mô tả (nội bộ)</label>
+              <textarea class="form-control" id="description" rows="2" 
+                        placeholder="VD: Khuyến mãi tháng 10"></textarea>
+            </div>
+          </div>
+
+          <!-- Discount Type & Value -->
+          <div class="form-section">
+            <h5 class="form-section-title"><i class="fas fa-percentage me-2"></i>Loại hình giảm giá</h5>
+            <div class="row mb-3">
+              <div class="col-12">
+                <div class="btn-group w-100" role="group">
+                  <input type="radio" class="btn-check" name="discountType" id="typePercentage" value="PERCENTAGE" checked />
+                  <label class="btn btn-outline-primary" for="typePercentage">
+                    <i class="fas fa-percent me-1"></i>Giảm theo %
+                  </label>
+                  
+                  <input type="radio" class="btn-check" name="discountType" id="typeFixed" value="FIXED_AMOUNT" />
+                  <label class="btn btn-outline-success" for="typeFixed">
+                    <i class="fas fa-money-bill me-1"></i>Giảm tiền cố định
+                  </label>
+                  
+                  <input type="radio" class="btn-check" name="discountType" id="typeFreeShip" value="FREE_SHIPPING" />
+                  <label class="btn btn-outline-info" for="typeFreeShip">
+                    <i class="fas fa-shipping-fast me-1"></i>Miễn phí vận chuyển
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label" id="valueLabel">Giá trị giảm (%) <span class="text-danger">*</span></label>
+                <input type="number" class="form-control" id="discountValue" required 
+                       min="0.01" step="0.01" placeholder="VD: 15" />
+              </div>
+              <div class="col-md-6 mb-3" id="maxDiscountGroup">
+                <label class="form-label">Giảm tối đa (VNĐ)</label>
+                <input type="number" class="form-control" id="maxDiscount" 
+                       min="0" step="1000" placeholder="VD: 100000" />
+                <small class="form-text text-muted">Để trống nếu không giới hạn</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Conditions -->
+          <div class="form-section">
+            <h5 class="form-section-title"><i class="fas fa-filter me-2"></i>Điều kiện áp dụng</h5>
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Giá trị đơn hàng tối thiểu (VNĐ)</label>
+                <input type="number" class="form-control" id="minOrderValue" 
+                       min="0" step="1000" placeholder="VD: 500000" />
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Giới hạn mỗi người dùng</label>
+                <input type="number" class="form-control" id="limitPerUser" 
+                       min="1" placeholder="VD: 1" />
+                <small class="form-text text-muted">Để trống nếu không giới hạn</small>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h5 class="form-section-title"><i class="fas fa-tags me-2"></i>Phạm vi catalog</h5>
+            <p class="text-muted small">Không chọn mục nào nghĩa là voucher áp dụng cho toàn bộ catalog. Có thể giữ Ctrl/Cmd để chọn nhiều mục.</p>
+            <div class="row g-3">
+              <div class="col-md-6 col-xl-3">
+                <label class="form-label" for="brandIds">Thương hiệu</label>
+                <select class="form-select" id="brandIds" multiple size="7" aria-describedby="scopeHelp"></select>
+              </div>
+              <div class="col-md-6 col-xl-3">
+                <label class="form-label" for="categoryIds">Danh mục</label>
+                <select class="form-select" id="categoryIds" multiple size="7"></select>
+              </div>
+              <div class="col-md-6 col-xl-3">
+                <label class="form-label" for="productIds">Sản phẩm</label>
+                <select class="form-select" id="productIds" multiple size="7"></select>
+              </div>
+              <div class="col-md-6 col-xl-3">
+                <label class="form-label" for="variantIds">Biến thể</label>
+                <select class="form-select" id="variantIds" multiple size="7"></select>
+                <small class="text-muted">Biến thể được tải theo sản phẩm đã chọn.</small>
+              </div>
+            </div>
+            <div id="scopeHelp" class="form-text mt-3" role="status" aria-live="polite">Đang tải dữ liệu phạm vi…</div>
+          </div>
+
+          <!-- Catalog Scope -->
+          <div class="form-section">
+            <h5 class="form-section-title"><i class="fas fa-tags me-2"></i>Phạm vi catalog</h5>
+            <div class="alert alert-light border scope-help" id="catalogScopeHelp">
+              <strong>Không chọn mục nào:</strong> voucher áp dụng cho toàn bộ catalog.
+              Nếu chọn ở nhiều nhóm, sản phẩm chỉ cần khớp <strong>một</strong> thương hiệu, danh mục,
+              sản phẩm hoặc biến thể đã chọn.
+            </div>
+            <div class="small text-muted mb-3" id="scopeStatus" role="status" aria-live="polite">
+              Đang tải dữ liệu catalog…
+            </div>
+            <div class="row">
+              <div class="col-lg-6 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <label class="form-label mb-0" for="brandIds">Thương hiệu</label>
+                  <span class="badge text-bg-light" id="brandIdsCount">0 đã chọn</span>
+                </div>
+                <select class="form-select scope-select" id="brandIds" multiple disabled
+                        aria-describedby="catalogScopeHelp brandScopeHelp"></select>
+                <small class="form-text text-muted" id="brandScopeHelp">Chọn một hoặc nhiều thương hiệu.</small>
+              </div>
+              <div class="col-lg-6 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <label class="form-label mb-0" for="categoryIds">Danh mục</label>
+                  <span class="badge text-bg-light" id="categoryIdsCount">0 đã chọn</span>
+                </div>
+                <select class="form-select scope-select" id="categoryIds" multiple disabled
+                        aria-describedby="catalogScopeHelp categoryScopeHelp"></select>
+                <small class="form-text text-muted" id="categoryScopeHelp">Danh mục cha bao gồm cả các danh mục con.</small>
+              </div>
+              <div class="col-lg-6 mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <label class="form-label mb-0" for="productIds">Sản phẩm</label>
+                  <span class="badge text-bg-light" id="productIdsCount">0 đã chọn</span>
+                </div>
+                <select class="form-select scope-select" id="productIds" multiple disabled
+                        aria-describedby="catalogScopeHelp productScopeHelp"></select>
+                <small class="form-text text-muted" id="productScopeHelp">Phạm vi ở cấp sản phẩm, áp dụng cho mọi biến thể của sản phẩm đó.</small>
+              </div>
+              <div class="col-lg-6 mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <label class="form-label mb-0" for="variantIds">Biến thể</label>
+                  <span class="badge text-bg-light" id="variantIdsCount">0 đã chọn</span>
+                </div>
+                <select class="form-select scope-select" id="variantIds" multiple disabled
+                        aria-describedby="catalogScopeHelp variantScopeHelp"></select>
+                <small class="form-text text-muted" id="variantScopeHelp">Dùng khi voucher chỉ áp dụng cho shade hoặc dung tích cụ thể.</small>
+              </div>
+            </div>
+            <p class="small text-muted mb-0">
+              Giữ <kbd>Ctrl</kbd> (Windows) hoặc <kbd>⌘</kbd> (macOS) để chọn nhiều mục; bấm lại để bỏ chọn.
+              Mục có nhãn “đã ẩn” được giữ lại để voucher cũ không mất phạm vi khi chỉnh sửa.
+            </p>
+          </div>
+
+          <!-- Quantity & Time -->
+          <div class="form-section">
+            <h5 class="form-section-title"><i class="fas fa-calendar-alt me-2"></i>Số lượng & Thời gian</h5>
+            <div class="row">
+              <div class="col-md-4 mb-3">
+                <label class="form-label">Tổng số lượng <span class="text-danger">*</span></label>
+                <input type="number" class="form-control" id="totalQuantity" required 
+                       min="1" placeholder="VD: 100" />
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label">Ngày bắt đầu <span class="text-danger">*</span></label>
+                <input type="datetime-local" class="form-control" id="startDate" required />
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label">Ngày kết thúc <span class="text-danger">*</span></label>
+                <input type="datetime-local" class="form-control" id="endDate" required />
+              </div>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="d-flex justify-content-end gap-2">
+            <a href="/admin/vouchers" class="btn btn-secondary">
+              <i class="fas fa-times me-1"></i>Hủy
+            </a>
+            <button type="submit" class="btn btn-primary" id="submitBtn" disabled>
+              <i class="fas fa-save me-1"></i>Lưu mã giảm giá
+            </button>
+          </div>
+        </form>
+      </main>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/admin-voucher-form.js"></script>
+</body>
+</html>

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quản lý đổi trả – BeautyStore</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <style>
+    :root { --berry:#a23b62; --plum:#3d243c; --ivory:#fffaf5; --sage:#78917b; }
+    body { background:var(--ivory); color:var(--plum); }
+    .sidebar { min-height:100vh; background:linear-gradient(180deg,var(--plum),#633b57); }
+    .sidebar .nav-link { color:#f9edf2; border-radius:.55rem; margin:.12rem .6rem; }
+    .sidebar .nav-link:hover,.sidebar .nav-link.active { color:#fff; background:rgba(255,255,255,.16); }
+    .sidebar .nav-link i { width:1.4rem; }
+    .card { border:0; box-shadow:0 .25rem 1.25rem rgba(61,36,60,.08); }
+    .btn-primary { --bs-btn-bg:var(--berry); --bs-btn-border-color:var(--berry); }
+    .evidence-thumb { width:64px; height:64px; object-fit:cover; border-radius:.5rem; }
+    .timeline { border-left:2px solid #ead8df; padding-left:1rem; }
+  </style>
+</head>
+<body>
+  <button class="btn btn-dark d-md-none m-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#adminSidebar" aria-label="Mở menu">
+    <i class="fas fa-bars" aria-hidden="true"></i>
+  </button>
+  <div class="container-fluid">
+    <div class="row">
+      <nav class="col-md-3 col-lg-2 d-md-block sidebar offcanvas-md offcanvas-start" id="adminSidebar" aria-label="Quản trị">
+        <div class="offcanvas-header d-md-none"><h5 class="text-white">BeautyStore Admin</h5><button class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Đóng"></button></div>
+        <div class="position-sticky pt-3">
+          <div class="text-center text-white px-3 mb-4"><i class="fas fa-spa fa-2x mb-2" aria-hidden="true"></i><h5>BeautyStore</h5><small id="adminEmail">Quản trị viên</small></div>
+          <div class="nav flex-column">
+            <a class="nav-link" href="/admin"><i class="fas fa-chart-line"></i>Tổng quan</a>
+            <a class="nav-link" href="/admin/products"><i class="fas fa-pump-soap"></i>Sản phẩm</a>
+            <a class="nav-link" href="/admin/orders"><i class="fas fa-bag-shopping"></i>Đơn hàng</a>
+            <a class="nav-link active" href="/admin/returns"><i class="fas fa-arrow-rotate-left"></i>Đổi trả</a>
+            <a class="nav-link" href="/admin/reviews"><i class="fas fa-star"></i>Đánh giá</a>
+            <a class="nav-link" href="/admin/vouchers"><i class="fas fa-ticket"></i>Voucher</a>
+            <a class="nav-link" href="/admin/accounts"><i class="fas fa-users"></i>Tài khoản</a>
+            <a class="nav-link" href="/admin/support"><i class="fas fa-comments"></i>Hỗ trợ</a>
+            <button class="nav-link text-start border-0 bg-transparent" id="logoutButton" type="button"><i class="fas fa-right-from-bracket"></i>Đăng xuất</button>
+          </div>
+        </div>
+      </nav>
+      <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+          <div><h1 class="h2 mb-1">Yêu cầu đổi trả</h1><p class="text-muted mb-0">Duyệt yêu cầu, xác nhận nhận hàng và nhập lại đúng lô.</p></div>
+          <button class="btn btn-outline-secondary" id="refreshButton" type="button"><i class="fas fa-rotate me-1"></i>Làm mới</button>
+        </div>
+        <div id="pageAlert" class="visually-hidden" role="status" aria-live="polite"></div>
+        <section class="card mb-4" aria-label="Bộ lọc">
+          <div class="card-body row g-3 align-items-end">
+            <div class="col-sm-6 col-lg-4"><label class="form-label" for="statusFilter">Trạng thái</label><select class="form-select" id="statusFilter"><option value="">Tất cả</option><option value="REQUESTED">Mới gửi</option><option value="APPROVED">Đã duyệt</option><option value="RECEIVED">Đã nhận hàng</option><option value="REJECTED">Từ chối</option><option value="REFUNDED">Đã hoàn tiền</option></select></div>
+            <div class="col-sm-6 col-lg-4"><label class="form-label" for="pageSize">Số dòng</label><select class="form-select" id="pageSize"><option>10</option><option selected>20</option><option>50</option></select></div>
+          </div>
+        </section>
+        <section class="card">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th>Mã yêu cầu</th><th>Đơn hàng</th><th>Sản phẩm</th><th>Ngày gửi</th><th>Trạng thái</th><th class="text-end">Thao tác</th></tr></thead><tbody id="returnsBody"><tr><td colspan="6" class="text-center py-5">Đang tải…</td></tr></tbody></table>
+          </div>
+          <div class="card-footer bg-white d-flex justify-content-between align-items-center"><span id="pageInfo" class="text-muted"></span><div class="btn-group"><button class="btn btn-sm btn-outline-secondary" id="prevPage" type="button">Trước</button><button class="btn btn-sm btn-outline-secondary" id="nextPage" type="button">Sau</button></div></div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div class="modal fade" id="returnModal" tabindex="-1" aria-labelledby="returnModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h2 class="modal-title h5" id="returnModalTitle">Chi tiết đổi trả</h2><button class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div><div class="modal-body" id="returnDetail"></div><div class="modal-footer flex-wrap"><button class="btn btn-outline-secondary" data-bs-dismiss="modal" type="button">Đóng</button><div class="d-flex gap-2" id="returnActions"></div></div></div></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/admin-returns.js"></script>
+</body>
+</html>

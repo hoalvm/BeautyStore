@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/header :: head(title='Mỹ phẩm – BeautyStore')}"></head>
+<body>
+<div th:replace="~{fragments/header :: header}"></div>
+
+<main id="main-content">
+    <section class="profile-header">
+        <div class="container text-center">
+            <p class="text-uppercase small fw-bold mb-2 opacity-75">Khám phá BeautyStore</p>
+            <h1 class="display-5 beauty-heading fw-bold"><i class="fas fa-spa me-3" aria-hidden="true"></i>Mỹ phẩm cho chu trình của bạn</h1>
+            <p class="lead mb-0">Lọc theo thương hiệu, loại da, nhu cầu và thành phần để tìm lựa chọn phù hợp.</p>
+        </div>
+    </section>
+
+    <div class="container py-4 py-lg-5">
+        <button class="btn btn-outline-danger d-lg-none w-100 mb-3" type="button" data-bs-toggle="collapse"
+                data-bs-target="#catalogFilters" aria-expanded="false" aria-controls="catalogFilters">
+            <i class="fas fa-sliders me-2" aria-hidden="true"></i>Mở bộ lọc
+        </button>
+        <div class="row g-4">
+            <aside class="col-lg-3 collapse d-lg-block" id="catalogFilters" aria-label="Bộ lọc sản phẩm">
+                <div class="card border-0 shadow-sm sticky-lg-top" style="top: 1rem;">
+                    <div class="card-header text-white" style="background:var(--beauty-plum)">
+                        <h2 class="h5 mb-0"><i class="fas fa-filter me-2" aria-hidden="true"></i>Bộ lọc</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="filterSearchInput">Tìm kiếm</label>
+                            <div class="input-group">
+                                <input type="search" id="filterSearchInput" class="form-control" placeholder="Tên, thương hiệu, thành phần...">
+                                <button class="btn btn-primary" type="button" id="filterSearchBtn" aria-label="Tìm"><i class="fas fa-search"></i></button>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="brandFilter">Thương hiệu</label>
+                            <select class="form-select" id="brandFilter"><option value="">Tất cả thương hiệu</option></select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="skinTypeFilter">Loại da</label>
+                            <select class="form-select" id="skinTypeFilter"><option value="">Mọi loại da</option></select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="concernFilter">Nhu cầu da</label>
+                            <select class="form-select" id="concernFilter"><option value="">Mọi nhu cầu</option></select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="hairTypeFilter">Loại tóc</label>
+                            <select class="form-select" id="hairTypeFilter"><option value="">Mọi loại tóc</option></select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="formFilter">Dạng sản phẩm</label>
+                            <select class="form-select" id="formFilter"><option value="">Tất cả dạng</option></select>
+                        </div>
+                        <fieldset class="mb-3">
+                            <legend class="form-label fw-bold">Danh mục</legend>
+                            <div id="categoryFilter" class="overflow-auto" style="max-height:220px" aria-live="polite"></div>
+                        </fieldset>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="priceFilter">Khoảng giá</label>
+                            <select class="form-select" id="priceFilter">
+                                <option value="">Tất cả mức giá</option>
+                                <option value="0-200000">Dưới 200.000₫</option>
+                                <option value="200000-500000">200.000₫ – 500.000₫</option>
+                                <option value="500000-1000000">500.000₫ – 1.000.000₫</option>
+                                <option value="1000000-999999999">Trên 1.000.000₫</option>
+                            </select>
+                        </div>
+                        <div class="form-check mb-2"><input class="form-check-input" type="checkbox" id="inStockFilter"><label class="form-check-label" for="inStockFilter">Chỉ còn hàng</label></div>
+                        <div class="form-check mb-3"><input class="form-check-input" type="checkbox" id="onSaleFilter"><label class="form-check-label" for="onSaleFilter">Đang ưu đãi</label></div>
+                        <button class="btn btn-outline-danger w-100" type="button" id="resetFiltersBtn"><i class="fas fa-rotate-left me-2"></i>Đặt lại</button>
+                    </div>
+                </div>
+            </aside>
+
+            <section class="col-lg-9" aria-labelledby="catalogTitle">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+                    <h2 class="h5 mb-0" id="catalogTitle"><span id="productCount">0</span> sản phẩm <span id="searchInfo"></span></h2>
+                    <div>
+                        <label for="sortFilter" class="visually-hidden">Sắp xếp</label>
+                        <select class="form-select" id="sortFilter">
+                            <option value="newest">Mới nhất</option>
+                            <option value="price-asc">Giá thấp đến cao</option>
+                            <option value="price-desc">Giá cao đến thấp</option>
+                            <option value="rating-desc">Đánh giá cao</option>
+                            <option value="name">Tên A–Z</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="activeFilters" class="d-flex flex-wrap gap-2 mb-3" aria-live="polite"></div>
+                <div id="productsContainer" class="row g-4" aria-live="polite" aria-busy="true">
+                    <div class="col-12 text-center py-5"><span class="spinner-border text-danger" aria-hidden="true"></span><p class="mt-3 text-muted">Đang tải mỹ phẩm...</p></div>
+                </div>
+                <nav aria-label="Phân trang sản phẩm" class="mt-5"><ul class="pagination justify-content-center" id="pagination"></ul></nav>
+            </section>
+        </div>
+    </div>
+</main>
+
+<div th:replace="~{fragments/footer :: footer}"></div>
+<script th:src="@{/js/auth.js}"></script>
+<script th:src="@{/js/products.js(v=4.0)}" defer></script>
+</body>
+</html>
