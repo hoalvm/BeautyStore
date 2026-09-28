@@ -215,6 +215,9 @@ public class UserService {
                 });
 
         otpService.validateOtp(sanitizedEmail, otp, "forgot-password");
+        if (passwordEncoder.matches(newPassword, user.getPasswd())) {
+            throw new IllegalArgumentException("Mật khẩu mới phải khác mật khẩu hiện tại");
+        }
         user.setPasswd(passwordEncoder.encode(newPassword));
         user.setAuthVersion(user.getAuthVersion() + 1);
         userRepository.save(user);

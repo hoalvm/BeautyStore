@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import t4m.beauty_store.auth.exception.InvalidCredentialsException;
+import t4m.beauty_store.auth.entity.User;
 import t4m.beauty_store.auth.repository.RoleRepository;
 import t4m.beauty_store.auth.repository.UserRepository;
 import t4m.beauty_store.auth.util.JwtUtil;
@@ -50,5 +51,24 @@ class UserServiceSecurityTests {
         service.sendActivationOtp("missing@example.test");
 
         verifyNoInteractions(otp);
+    }
+
+    @Test
+    void passwordResetConsumesAValidOtpBeforeRejectingPasswordReuse() {
+        User user = new User();
+        user.setEmail("customer@example.test");
+        user.setPasswd("current-hash");
+        when(users.findByEmail("customer@example.test")).thenReturn(Optional.of(user));
+        when(passwords.matches("Secret@123", "current-hash")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.resetPassword(
+                "customer@example.test", "123456", "Secret@123"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("khác");
+
+        var order = inOrder(otp, passwords);
+        order.verify(otp).validateOtp("customer@example.test", "123456", "forgot-password");
+        order.verify(passwords).matches("Secret@123", "current-hash");
+        verify(users, never()).save(user);
     }
 }
