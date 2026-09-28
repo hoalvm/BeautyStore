@@ -145,7 +145,8 @@ class BeautyStoreMySqlMigrationTests {
             assertThat(scalar(statement, "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='user' AND column_name='auth_version'")).isEqualTo(1);
             assertThat(scalar(statement, "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='orders' AND index_name='idx_orders_status_created'")).isGreaterThan(0);
             assertThat(scalar(statement, "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='inventory_batches' AND index_name='idx_batches_variant_sellable'")).isGreaterThan(0);
-            assertThat(scalar(statement, "SELECT COUNT(*) FROM flyway_schema_history WHERE success=TRUE")).isEqualTo(16);
+            assertThat(scalar(statement, "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='support_message' AND index_name='idx_support_message_unread_sender'")).isGreaterThan(0);
+            assertThat(scalar(statement, "SELECT COUNT(*) FROM flyway_schema_history WHERE success=TRUE")).isEqualTo(17);
         }
     }
 
