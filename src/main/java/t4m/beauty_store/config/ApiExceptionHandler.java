@@ -34,9 +34,15 @@ public class ApiExceptionHandler {
             "Dữ liệu gửi lên chưa hợp lệ", fieldErrors, request);
     }
 
-    @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
+    @ExceptionHandler(IllegalArgumentException.class)
     ResponseEntity<ApiErrorResponse> badRequest(RuntimeException exception, HttpServletRequest request) {
         return response(HttpStatus.BAD_REQUEST, "BUSINESS_RULE_VIOLATION",
+            exception.getMessage(), Map.of(), request);
+    }
+
+    @ExceptionHandler(ApiException.class)
+    ResponseEntity<ApiErrorResponse> domainError(ApiException exception, HttpServletRequest request) {
+        return response(exception.getStatus(), exception.getCode(),
             exception.getMessage(), Map.of(), request);
     }
 
