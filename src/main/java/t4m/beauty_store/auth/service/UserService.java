@@ -73,9 +73,7 @@ public class UserService {
         userRepository.save(user);
         logger.info("Customer registered and is pending activation");
 
-        String otp = otpService.generateOtp();
-        otpService.storeOtp(sanitizedEmail, otp, "activation");
-        otpService.sendOtpEmail(sanitizedEmail, otp, "Account Activation");
+        otpService.issueOtp(sanitizedEmail, "activation");
     }
 
     /**
@@ -96,9 +94,7 @@ public class UserService {
             throw new AccountNotActivatedException("Account already activated");
         }
 
-        String otp = otpService.generateOtp();
-        otpService.storeOtp(sanitizedEmail, otp, "activation");
-        otpService.sendOtpEmail(sanitizedEmail, otp, "Account Activation");
+        otpService.issueOtp(sanitizedEmail, "activation");
     }
 
     /**
@@ -196,9 +192,7 @@ public class UserService {
                     return new UserNotFoundException("User not found");
                 });
 
-        String otp = otpService.generateOtp();
-        otpService.storeOtp(sanitizedEmail, otp, "forgot-password");
-        otpService.sendOtpEmail(sanitizedEmail, otp, "Password Reset");
+        otpService.issueOtp(sanitizedEmail, "forgot-password");
     }
 
     /**

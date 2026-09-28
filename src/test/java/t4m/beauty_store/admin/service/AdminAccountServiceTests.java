@@ -87,16 +87,9 @@ class AdminAccountServiceTests {
     void adminPasswordResetCreatesStoresAndSendsPublicResetOtp() {
         User user = user(7L, "customer@example.com", true, "ROLE_USER");
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
-        when(otpService.generateOtp()).thenReturn("123456");
-
         service.resetPassword(7L);
 
-        InOrder otpFlow = inOrder(otpService);
-        otpFlow.verify(otpService).generateOtp();
-        otpFlow.verify(otpService).storeOtp(
-            "customer@example.com", "123456", "forgot-password");
-        otpFlow.verify(otpService).sendOtpEmail(
-            "customer@example.com", "123456", "Password Reset");
+        verify(otpService).issueOtp("customer@example.com", "forgot-password");
         verifyNoInteractions(emailService);
     }
 

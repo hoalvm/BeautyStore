@@ -352,9 +352,7 @@ public class AdminAccountService {
 
         // Reuse the same short-lived, rate-limited OTP flow that the public
         // reset form validates. No unpersisted reset token is emailed.
-        String otp = otpService.generateOtp();
-        otpService.storeOtp(user.getEmail(), otp, "forgot-password");
-        otpService.sendOtpEmail(user.getEmail(), otp, "Password Reset");
+        otpService.issueOtp(user.getEmail(), "forgot-password");
         logger.info("Admin password reset requested: userId={}", user.getId());
     }
 

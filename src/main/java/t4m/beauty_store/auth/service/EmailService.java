@@ -15,6 +15,7 @@ import t4m.beauty_store.config.StoreProperties;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 public class EmailService {
@@ -36,7 +37,7 @@ public class EmailService {
     }
 
     @Async
-    public void sendOtpEmail(String email, String otp, String action) {
+    public CompletableFuture<Void> sendOtpEmail(String email, String otp, String action) {
         sendTemplate(
                 email,
                 storeProperties.getName() + " - Mã xác thực OTP của bạn",
@@ -46,6 +47,7 @@ public class EmailService {
                         "action", action,
                         "storeName", storeProperties.getName(),
                         "supportEmail", storeProperties.getSupportEmail()));
+        return CompletableFuture.completedFuture(null);
     }
 
     @Async
