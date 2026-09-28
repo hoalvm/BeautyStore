@@ -6,11 +6,14 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import t4m.beauty_store.auth.exception.OtpRateLimitException;
 import t4m.beauty_store.auth.service.EmailService;
+import t4m.beauty_store.config.StoreTime;
 import t4m.beauty_store.order.entity.GuestOrderAccess;
 import t4m.beauty_store.order.entity.Order;
 import t4m.beauty_store.order.repository.GuestOrderAccessRepository;
 import t4m.beauty_store.order.repository.OrderRepository;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -29,6 +32,7 @@ class GuestOrderAccessServiceTests {
     private GuestOrderOtpVerificationService verificationService;
     private GuestOrderOtpRateLimiter rateLimiter;
     private GuestOrderAccessService service;
+    private StoreTime storeTime;
 
     @BeforeEach
     void setUp() {
@@ -38,9 +42,10 @@ class GuestOrderAccessServiceTests {
         emailService = mock(EmailService.class);
         verificationService = mock(GuestOrderOtpVerificationService.class);
         rateLimiter = mock(GuestOrderOtpRateLimiter.class);
+        storeTime = fixedTime();
         service = new GuestOrderAccessService(
             orderRepository, accessRepository, passwordEncoder, emailService,
-            verificationService, rateLimiter);
+            verificationService, rateLimiter, storeTime);
     }
 
     @Test
@@ -52,11 +57,7 @@ class GuestOrderAccessServiceTests {
             7L, "guest@example.com")).thenReturn(Optional.empty());
         when(passwordEncoder.encode(org.mockito.ArgumentMatchers.anyString()))
             .thenReturn("otp-hash");
-        LocalDateTime before = LocalDateTime.now();
-
         service.requestOtp(" ord-guest-1 ", " GUEST@example.com ", "203.0.113.9");
-
-        LocalDateTime after = LocalDateTime.now();
         ArgumentCaptor<GuestOrderAccess> accessCaptor =
             ArgumentCaptor.forClass(GuestOrderAccess.class);
         ArgumentCaptor<String> otpCaptor = ArgumentCaptor.forClass(String.class);
@@ -70,17 +71,15 @@ class GuestOrderAccessServiceTests {
 
         GuestOrderAccess access = accessCaptor.getValue();
         assertThat(otpCaptor.getValue()).matches("\\d{6}");
-        assertThat(access.getExpiresAt())
-            .isBetween(before.plusMinutes(5), after.plusMinutes(5));
-        assertThat(access.getResendAvailableAt())
-            .isBetween(before.plusSeconds(60), after.plusSeconds(60));
+        assertThat(access.getExpiresAt()).isEqualTo(storeTime.currentDateTime().plusMinutes(5));
+        assertThat(access.getResendAvailableAt()).isEqualTo(storeTime.currentDateTime().plusSeconds(60));
     }
 
     @Test
     void resendDuringCooldownDoesNotCreateOrEmailAnotherChallenge() {
         Order order = guestOrder();
         GuestOrderAccess existing = GuestOrderAccess.builder()
-            .resendAvailableAt(LocalDateTime.now().plusSeconds(30))
+            .resendAvailableAt(storeTime.currentDateTime().plusSeconds(30))
             .build();
         when(orderRepository.findByOrderNumberForUpdate("ORD-GUEST-1"))
             .thenReturn(Optional.of(order));
@@ -146,5 +145,9 @@ class GuestOrderAccessServiceTests {
             .customerName("Khách Beauty")
             .customerEmail("guest@example.com")
             .build();
+    }
+
+    private static StoreTime fixedTime() {
+        return new StoreTime(Clock.fixed(Instant.parse("2026-06-15T03:00:00Z"), StoreTime.ZONE));
     }
 }

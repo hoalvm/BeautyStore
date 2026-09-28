@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import t4m.beauty_store.config.ApiException;
+import t4m.beauty_store.config.StoreTime;
 import t4m.beauty_store.support.dto.SupportSessionDto;
 import t4m.beauty_store.support.dto.SupportMessageResponse;
 import t4m.beauty_store.support.entity.SupportMessage;
@@ -12,7 +13,6 @@ import t4m.beauty_store.auth.entity.User;
 import t4m.beauty_store.support.repository.SupportMessageRepository;
 import t4m.beauty_store.support.repository.SupportSessionRepository;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -23,6 +23,7 @@ public class SupportService {
 
     private final SupportSessionRepository sessionRepository;
     private final SupportMessageRepository messageRepository;
+    private final StoreTime storeTime;
 
     @Transactional
     public SupportSession createOrGetSession(Long userId, String userEmail, String userName) {
@@ -38,7 +39,7 @@ public class SupportService {
                 });
         if (!"ACTIVE".equals(session.getStatus())) {
             session.setStatus("ACTIVE");
-            session.setUpdatedAt(LocalDateTime.now());
+            session.setUpdatedAt(storeTime.currentDateTime());
             session = sessionRepository.save(session);
         }
         return session;
@@ -61,7 +62,7 @@ public class SupportService {
             });
         if (!"ACTIVE".equals(session.getStatus())) {
             session.setStatus("ACTIVE");
-            session.setUpdatedAt(LocalDateTime.now());
+            session.setUpdatedAt(storeTime.currentDateTime());
             session = sessionRepository.save(session);
         }
         return session;
@@ -94,9 +95,9 @@ public class SupportService {
         message.setUserName(session.getUserName());
         message.setSenderType("USER");
         message.setMessage(messageText);
-        message.setCreatedAt(LocalDateTime.now());
+        message.setCreatedAt(storeTime.currentDateTime());
         SupportMessage saved = messageRepository.save(message);
-        session.setUpdatedAt(LocalDateTime.now());
+        session.setUpdatedAt(storeTime.currentDateTime());
         session.setUnreadCount(session.getUnreadCount() + 1);
         sessionRepository.save(session);
         return saved;
@@ -118,9 +119,9 @@ public class SupportService {
         message.setUserName("Chuyên viên BeautyStore");
         message.setSenderType("ADMIN");
         message.setMessage(messageText);
-        message.setCreatedAt(LocalDateTime.now());
+        message.setCreatedAt(storeTime.currentDateTime());
         SupportMessage saved = messageRepository.save(message);
-        session.setUpdatedAt(LocalDateTime.now());
+        session.setUpdatedAt(storeTime.currentDateTime());
         sessionRepository.save(session);
         return saved;
     }
@@ -162,7 +163,7 @@ public class SupportService {
         sessionRepository.findBySessionIdForUpdate(sessionId)
                 .ifPresent(session -> {
                     session.setStatus("CLOSED");
-                    session.setUpdatedAt(LocalDateTime.now());
+                    session.setUpdatedAt(storeTime.currentDateTime());
                     sessionRepository.save(session);
                 });
     }

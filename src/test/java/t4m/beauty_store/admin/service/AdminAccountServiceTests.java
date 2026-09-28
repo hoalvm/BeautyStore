@@ -20,6 +20,7 @@ import t4m.beauty_store.auth.service.EmailService;
 import t4m.beauty_store.auth.service.OtpService;
 import t4m.beauty_store.cart.repository.CartRepository;
 import t4m.beauty_store.config.StoreProperties;
+import t4m.beauty_store.config.StoreTime;
 import t4m.beauty_store.favorite.repository.FavoriteRepository;
 import t4m.beauty_store.order.repository.OrderRepository;
 import t4m.beauty_store.rating.repository.RatingRepository;
@@ -27,6 +28,8 @@ import t4m.beauty_store.review.repository.ReviewRepository;
 import t4m.beauty_store.returns.repository.ReturnRequestRepository;
 import t4m.beauty_store.voucher.repository.VoucherUsageRepository;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -74,7 +77,7 @@ class AdminAccountServiceTests {
         service = new AdminAccountService(userRepository, roleRepository, passwordEncoder,
             emailService, otpService, orderRepository, cartRepository, favoriteRepository,
             ratingRepository, reviewRepository, returnRequestRepository, voucherUsageRepository,
-            new StoreProperties());
+            new StoreProperties(), fixedTime());
     }
 
     @Test
@@ -321,6 +324,10 @@ class AdminAccountServiceTests {
         user.setActivated(activated);
         user.setRoles(Set.of(role));
         return user;
+    }
+
+    private static StoreTime fixedTime() {
+        return new StoreTime(Clock.fixed(Instant.parse("2026-06-15T03:00:00Z"), StoreTime.ZONE));
     }
 
 }

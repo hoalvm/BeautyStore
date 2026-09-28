@@ -8,6 +8,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import t4m.beauty_store.image.entity.EvidenceKind;
+import t4m.beauty_store.config.StoreTime;
 import t4m.beauty_store.image.entity.PendingEvidenceUpload;
 import t4m.beauty_store.image.repository.PendingEvidenceUploadRepository;
 import t4m.beauty_store.order.entity.Order;
@@ -17,7 +18,9 @@ import t4m.beauty_store.order.repository.OrderItemRepository;
 import t4m.beauty_store.product.service.CloudinaryService;
 import t4m.beauty_store.review.repository.ReviewRepository;
 
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -43,7 +46,7 @@ class EvidenceUploadServiceTests {
         cloudinaryService = mock(CloudinaryService.class);
         reviewRepository = mock(ReviewRepository.class);
         service = new EvidenceUploadService(
-            uploadRepository, orderItemRepository, cloudinaryService, reviewRepository);
+            uploadRepository, orderItemRepository, cloudinaryService, reviewRepository, fixedTime());
         ReflectionTestUtils.setField(service, "pendingTtl", Duration.ofHours(2));
         Order order = Order.builder().id(10L).status(OrderStatus.DELIVERED).build();
         deliveredItem = OrderItem.builder().id(20L).order(order).build();
@@ -176,5 +179,9 @@ class EvidenceUploadServiceTests {
 
     private MockMultipartFile image() {
         return new MockMultipartFile("image", "proof.png", "image/png", new byte[]{1});
+    }
+
+    private static StoreTime fixedTime() {
+        return new StoreTime(Clock.fixed(Instant.parse("2026-06-15T03:00:00Z"), StoreTime.ZONE));
     }
 }

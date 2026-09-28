@@ -5,9 +5,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import t4m.beauty_store.chatbot.dto.ConversationState;
+import t4m.beauty_store.config.StoreTime;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -24,6 +24,7 @@ public class InteractionLoggingService {
     private final Map<String, ConversationState> conversationStates = new ConcurrentHashMap<>();
     private final Map<String, Integer> intentFrequency = new ConcurrentHashMap<>();
     private final Map<String, Integer> productClickThroughs = new ConcurrentHashMap<>();
+    private final StoreTime storeTime;
     
     /**
      * Log conversation state
@@ -41,8 +42,8 @@ public class InteractionLoggingService {
         return conversationStates.computeIfAbsent(conversationId, id -> {
             ConversationState state = new ConversationState();
             state.setConversationId(id);
-            state.setStartTime(LocalDateTime.now());
-            state.setLastUpdateTime(LocalDateTime.now());
+            state.setStartTime(storeTime.currentDateTime());
+            state.setLastUpdateTime(storeTime.currentDateTime());
             state.setCurrentStage(ConversationState.ConversationStage.GREETING);
             state.setMessageCount(0);
             return state;
@@ -55,7 +56,7 @@ public class InteractionLoggingService {
     public void updateState(String conversationId, ConversationState.ConversationStage stage) {
         ConversationState state = getOrCreateState(conversationId);
         state.setCurrentStage(stage);
-        state.setLastUpdateTime(LocalDateTime.now());
+        state.setLastUpdateTime(storeTime.currentDateTime());
         logConversation(conversationId, state);
     }
     
@@ -147,7 +148,7 @@ public class InteractionLoggingService {
      * Cleanup old conversations (memory management)
      */
     public void cleanupOldConversations(int maxAgeHours) {
-        LocalDateTime cutoff = LocalDateTime.now().minusHours(maxAgeHours);
+        var cutoff = storeTime.currentDateTime().minusHours(maxAgeHours);
         
         conversationStates.entrySet().removeIf(entry -> 
             entry.getValue().getLastUpdateTime().isBefore(cutoff)

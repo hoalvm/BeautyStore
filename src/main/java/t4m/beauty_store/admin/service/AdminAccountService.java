@@ -24,12 +24,12 @@ import t4m.beauty_store.cart.repository.CartRepository;
 import t4m.beauty_store.favorite.repository.FavoriteRepository;
 import t4m.beauty_store.rating.repository.RatingRepository;
 import t4m.beauty_store.config.StoreProperties;
+import t4m.beauty_store.config.StoreTime;
 import t4m.beauty_store.review.repository.ReviewRepository;
 import t4m.beauty_store.returns.repository.ReturnRequestRepository;
 import t4m.beauty_store.voucher.repository.VoucherUsageRepository;
 import t4m.beauty_store.auth.validation.PasswordPolicy;
 
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -51,6 +51,7 @@ public class AdminAccountService {
     private final ReturnRequestRepository returnRequestRepository;
     private final VoucherUsageRepository voucherUsageRepository;
     private final StoreProperties storeProperties;
+    private final StoreTime storeTime;
 
     /**
      * Get all accounts with pagination, search, and filtering
@@ -103,8 +104,8 @@ public class AdminAccountService {
         user.setName(request.getName());
         user.setPhone(request.getPhone());
         user.setActivated(true); // Admin-created accounts are auto-activated
-        user.setCreated(LocalDateTime.now());
-        user.setUpdated(LocalDateTime.now());
+        user.setCreated(storeTime.currentDateTime());
+        user.setUpdated(storeTime.currentDateTime());
 
         // Assign role
         Role role = roleRepository.findByRname(request.getRole())
@@ -145,7 +146,7 @@ public class AdminAccountService {
         user.setName(request.getName());
         user.setPhone(request.getPhone());
         user.setEmail(request.getEmail());
-        user.setUpdated(LocalDateTime.now());
+        user.setUpdated(storeTime.currentDateTime());
 
         // Update role if provided
         if (request.getRole() != null && !request.getRole().isEmpty()) {
@@ -240,7 +241,7 @@ public class AdminAccountService {
 
         user.setActivated(false);
         user.setAuthVersion(user.getAuthVersion() + 1);
-        user.setUpdated(LocalDateTime.now());
+        user.setUpdated(storeTime.currentDateTime());
         userRepository.save(user);
         logger.info("Admin account deactivated: userId={}", user.getId());
     }
@@ -255,7 +256,7 @@ public class AdminAccountService {
 
         user.setActivated(true);
         user.setAuthVersion(user.getAuthVersion() + 1);
-        user.setUpdated(LocalDateTime.now());
+        user.setUpdated(storeTime.currentDateTime());
         userRepository.save(user);
         logger.info("Admin account reactivated: userId={}", user.getId());
     }
@@ -299,7 +300,7 @@ public class AdminAccountService {
                 users.forEach(user -> {
                     user.setActivated(false);
                     user.setAuthVersion(user.getAuthVersion() + 1);
-                    user.setUpdated(LocalDateTime.now());
+                    user.setUpdated(storeTime.currentDateTime());
                 });
                 userRepository.saveAll(users);
                 logger.info("Admin banned {} accounts", users.size());
@@ -309,7 +310,7 @@ public class AdminAccountService {
                 users.forEach(user -> {
                     user.setActivated(true);
                     user.setAuthVersion(user.getAuthVersion() + 1);
-                    user.setUpdated(LocalDateTime.now());
+                    user.setUpdated(storeTime.currentDateTime());
                 });
                 userRepository.saveAll(users);
                 logger.info("Admin unbanned {} accounts", users.size());

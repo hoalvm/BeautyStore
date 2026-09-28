@@ -2,12 +2,16 @@ package t4m.beauty_store.chatbot.service;
 
 import org.junit.jupiter.api.Test;
 import t4m.beauty_store.config.StoreProperties;
+import t4m.beauty_store.config.StoreTime;
 import t4m.beauty_store.product.repository.CategoryRepository;
 import t4m.beauty_store.product.repository.ProductRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
+
+import java.time.Clock;
+import java.time.Instant;
 
 class ChatbotServiceSafetyTests {
 
@@ -17,7 +21,8 @@ class ChatbotServiceSafetyTests {
             productRepository,
             categoryRepository,
             new IntentRecognitionService(),
-            new InteractionLoggingService(),
+            new InteractionLoggingService(new StoreTime(
+                Clock.fixed(Instant.parse("2026-06-15T03:00:00Z"), StoreTime.ZONE))),
             new StoreProperties());
 
     @Test

@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.server.ResponseStatusException;
 import t4m.beauty_store.config.ApiException;
+import t4m.beauty_store.config.StoreTime;
 import t4m.beauty_store.auth.entity.Role;
 import t4m.beauty_store.auth.entity.User;
 import t4m.beauty_store.support.entity.SupportMessage;
@@ -11,6 +12,8 @@ import t4m.beauty_store.support.entity.SupportSession;
 import t4m.beauty_store.support.repository.SupportMessageRepository;
 import t4m.beauty_store.support.repository.SupportSessionRepository;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -29,7 +32,7 @@ class SupportServiceTests {
     void setUp() {
         sessionRepository = mock(SupportSessionRepository.class);
         messageRepository = mock(SupportMessageRepository.class);
-        service = new SupportService(sessionRepository, messageRepository);
+        service = new SupportService(sessionRepository, messageRepository, fixedTime());
         when(sessionRepository.save(any(SupportSession.class)))
             .thenAnswer(invocation -> invocation.getArgument(0));
         when(messageRepository.save(any(SupportMessage.class)))
@@ -164,5 +167,9 @@ class SupportServiceTests {
             user.setRoles(Set.of(role));
         }
         return user;
+    }
+
+    private static StoreTime fixedTime() {
+        return new StoreTime(Clock.fixed(Instant.parse("2026-06-15T03:00:00Z"), StoreTime.ZONE));
     }
 }
