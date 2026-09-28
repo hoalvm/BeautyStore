@@ -51,7 +51,8 @@ public class EmailService {
     }
 
     @Async
-    public void sendGuestOrderOtp(String email, String customerName, String orderNumber, String otp) {
+    public CompletableFuture<Void> sendGuestOrderOtp(
+            String email, String customerName, String orderNumber, String otp) {
         sendTemplate(
                 email,
                 storeProperties.getName() + " - Mã xác thực tra cứu đơn hàng",
@@ -63,6 +64,7 @@ public class EmailService {
                         "orderNumber", safeText(orderNumber, 100),
                         "storeName", storeProperties.getName(),
                         "supportEmail", storeProperties.getSupportEmail()));
+        return CompletableFuture.completedFuture(null);
     }
 
     @Async

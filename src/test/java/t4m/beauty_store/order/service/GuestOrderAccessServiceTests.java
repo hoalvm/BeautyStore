@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import t4m.beauty_store.auth.exception.OtpRateLimitException;
-import t4m.beauty_store.auth.service.EmailService;
 import t4m.beauty_store.config.StoreTime;
 import t4m.beauty_store.order.entity.GuestOrderAccess;
 import t4m.beauty_store.order.entity.Order;
@@ -21,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -28,7 +28,7 @@ class GuestOrderAccessServiceTests {
     private OrderRepository orderRepository;
     private GuestOrderAccessRepository accessRepository;
     private PasswordEncoder passwordEncoder;
-    private EmailService emailService;
+    private GuestOrderOtpDeliveryService otpDeliveryService;
     private GuestOrderOtpVerificationService verificationService;
     private GuestOrderOtpRateLimiter rateLimiter;
     private GuestOrderAccessService service;
@@ -39,12 +39,12 @@ class GuestOrderAccessServiceTests {
         orderRepository = mock(OrderRepository.class);
         accessRepository = mock(GuestOrderAccessRepository.class);
         passwordEncoder = mock(PasswordEncoder.class);
-        emailService = mock(EmailService.class);
+        otpDeliveryService = mock(GuestOrderOtpDeliveryService.class);
         verificationService = mock(GuestOrderOtpVerificationService.class);
         rateLimiter = mock(GuestOrderOtpRateLimiter.class);
         storeTime = fixedTime();
         service = new GuestOrderAccessService(
-            orderRepository, accessRepository, passwordEncoder, emailService,
+            orderRepository, accessRepository, passwordEncoder, otpDeliveryService,
             verificationService, rateLimiter, storeTime);
     }
 
@@ -57,12 +57,19 @@ class GuestOrderAccessServiceTests {
             7L, "guest@example.com")).thenReturn(Optional.empty());
         when(passwordEncoder.encode(org.mockito.ArgumentMatchers.anyString()))
             .thenReturn("otp-hash");
+        when(accessRepository.saveAndFlush(org.mockito.ArgumentMatchers.any()))
+            .thenAnswer(invocation -> {
+                GuestOrderAccess saved = invocation.getArgument(0);
+                saved.setId(99L);
+                return saved;
+            });
         service.requestOtp(" ord-guest-1 ", " GUEST@example.com ", "203.0.113.9");
         ArgumentCaptor<GuestOrderAccess> accessCaptor =
             ArgumentCaptor.forClass(GuestOrderAccess.class);
         ArgumentCaptor<String> otpCaptor = ArgumentCaptor.forClass(String.class);
-        verify(accessRepository).save(accessCaptor.capture());
-        verify(emailService).sendGuestOrderOtp(
+        verify(accessRepository).saveAndFlush(accessCaptor.capture());
+        verify(otpDeliveryService).schedule(
+            org.mockito.ArgumentMatchers.eq(99L),
             org.mockito.ArgumentMatchers.eq("guest@example.com"),
             org.mockito.ArgumentMatchers.eq("Khách Beauty"),
             org.mockito.ArgumentMatchers.eq("ORD-GUEST-1"),
@@ -88,10 +95,8 @@ class GuestOrderAccessServiceTests {
 
         service.requestOtp("ORD-GUEST-1", "guest@example.com", "203.0.113.9");
 
-        verify(accessRepository, never()).save(org.mockito.ArgumentMatchers.any());
-        verify(emailService, never()).sendGuestOrderOtp(
-            org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
-            org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+        verify(accessRepository, never()).saveAndFlush(org.mockito.ArgumentMatchers.any());
+        verifyNoInteractions(otpDeliveryService);
     }
 
     @Test
