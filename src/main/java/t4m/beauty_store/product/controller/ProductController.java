@@ -10,6 +10,7 @@ import org.springframework.web.server.ResponseStatusException;
 import t4m.beauty_store.product.dto.*;
 import t4m.beauty_store.product.entity.Product;
 import t4m.beauty_store.product.service.ProductService;
+import t4m.beauty_store.config.PageResponse;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -21,12 +22,12 @@ public class ProductController {
     private final ProductService productService;
 
     @GetMapping
-    public ResponseEntity<Page<ProductResponse>> getAllProducts(
+    public ResponseEntity<PageResponse<ProductResponse>> getAllProducts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size) {
         validatePage(page, size);
-        return ResponseEntity.ok(productService.getAllProducts(PageRequest.of(page, size))
-            .map(ProductResponse::fromEntity));
+        return ResponseEntity.ok(PageResponse.from(productService.getAllProducts(PageRequest.of(page, size))
+            .map(ProductResponse::fromEntity)));
     }
 
     @GetMapping("/{id}")
@@ -48,13 +49,13 @@ public class ProductController {
     }
 
     @GetMapping("/category/{categoryId}")
-    public ResponseEntity<Page<ProductResponse>> getProductsByCategory(
+    public ResponseEntity<PageResponse<ProductResponse>> getProductsByCategory(
             @PathVariable Long categoryId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size) {
         validatePage(page, size);
-        return ResponseEntity.ok(productService.getProductsByCategory(categoryId, PageRequest.of(page, size))
-            .map(ProductResponse::fromEntity));
+        return ResponseEntity.ok(PageResponse.from(productService.getProductsByCategory(categoryId, PageRequest.of(page, size))
+            .map(ProductResponse::fromEntity)));
     }
 
     @GetMapping("/featured")
@@ -64,17 +65,17 @@ public class ProductController {
     }
 
     @GetMapping("/search")
-    public ResponseEntity<Page<ProductResponse>> searchProducts(
+    public ResponseEntity<PageResponse<ProductResponse>> searchProducts(
             @RequestParam String keyword,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size) {
         validatePage(page, size);
-        return ResponseEntity.ok(productService.searchProducts(keyword, PageRequest.of(page, size))
-            .map(ProductResponse::fromEntity));
+        return ResponseEntity.ok(PageResponse.from(productService.searchProducts(keyword, PageRequest.of(page, size))
+            .map(ProductResponse::fromEntity)));
     }
 
     @GetMapping("/filter")
-    public ResponseEntity<Page<ProductResponse>> filterProducts(
+    public ResponseEntity<PageResponse<ProductResponse>> filterProducts(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) String category,
@@ -99,8 +100,8 @@ public class ProductController {
         ProductService.ProductFilter filter = new ProductService.ProductFilter(
             keyword, categoryId, category, selectedBrand, skinType, concern, hairType, hairConcern,
             form, finish, ingredient, minPrice, maxPrice, inStock, onSale, sort);
-        return ResponseEntity.ok(productService.filterProducts(filter, PageRequest.of(page, size))
-            .map(ProductResponse::fromEntity));
+        return ResponseEntity.ok(PageResponse.from(productService.filterProducts(filter, PageRequest.of(page, size))
+            .map(ProductResponse::fromEntity)));
     }
 
     @GetMapping("/categories")

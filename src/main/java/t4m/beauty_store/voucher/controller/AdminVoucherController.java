@@ -10,6 +10,7 @@ import t4m.beauty_store.voucher.dto.VoucherRequest;
 import t4m.beauty_store.voucher.dto.VoucherResponse;
 import t4m.beauty_store.voucher.dto.VoucherStatsResponse;
 import t4m.beauty_store.voucher.service.AdminVoucherService;
+import t4m.beauty_store.config.PageResponse;
 
 @RestController
 @RequestMapping("/api/admin/vouchers")
@@ -38,7 +39,7 @@ public class AdminVoucherController {
     }
 
     @GetMapping
-    public ResponseEntity<Page<VoucherResponse>> getAllVouchers(
+    public ResponseEntity<PageResponse<VoucherResponse>> getAllVouchers(
             @RequestParam(required = false) String code,
             @RequestParam(required = false) String discountType,
             @RequestParam(required = false) Boolean active,
@@ -50,7 +51,7 @@ public class AdminVoucherController {
         Page<VoucherResponse> vouchers = adminVoucherService.getAllVouchers(
             code, discountType, active, status, page, size, sortBy, sortDir
         );
-        return ResponseEntity.ok(vouchers);
+        return ResponseEntity.ok(PageResponse.from(vouchers));
     }
 
     @GetMapping("/{id}")

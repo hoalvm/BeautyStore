@@ -13,6 +13,7 @@ import t4m.beauty_store.order.dto.OrderResponse;
 import t4m.beauty_store.order.entity.Order;
 import t4m.beauty_store.order.entity.OrderStatus;
 import t4m.beauty_store.order.service.OrderService;
+import t4m.beauty_store.config.PageResponse;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -25,7 +26,7 @@ public class AdminOrderController {
     private final OrderService orderService;
 
     @GetMapping
-    public ResponseEntity<Page<OrderResponse>> getAllOrders(
+    public ResponseEntity<PageResponse<OrderResponse>> getAllOrders(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) OrderStatus status) {
@@ -38,7 +39,7 @@ public class AdminOrderController {
         }
         
         Page<OrderResponse> response = orders.map(OrderResponse::fromEntity);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(PageResponse.from(response));
     }
 
     @GetMapping("/{id}")
