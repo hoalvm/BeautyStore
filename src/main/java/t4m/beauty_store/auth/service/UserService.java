@@ -19,6 +19,7 @@ import t4m.beauty_store.config.StoreProperties;
 import t4m.beauty_store.auth.validation.PasswordPolicy;
 
 import lombok.RequiredArgsConstructor;
+import jakarta.annotation.PostConstruct;
 
 import java.util.List;
 import java.util.Set;
@@ -36,6 +37,12 @@ public class UserService {
     private final OtpService otpService;
     private final EmailService emailService;
     private final StoreProperties storeProperties;
+    private String dummyPasswordHash;
+
+    @PostConstruct
+    void initializeDummyPasswordHash() {
+        dummyPasswordHash = passwordEncoder.encode("beautystore-dummy-password");
+    }
 
     private final Cache<String, Role> roleCache = Caffeine.newBuilder()
             .expireAfterWrite(1, TimeUnit.HOURS)
@@ -85,15 +92,10 @@ public class UserService {
         String sanitizedEmail = email.trim().toLowerCase();
         logger.info("Processing an activation OTP request");
 
-        User user = userRepository.findByEmail(sanitizedEmail)
-                .orElseThrow(() -> {
-                    logger.warn("Activation OTP rejected because the account does not exist");
-                    return new UserNotFoundException("User not found");
-                });
-
-        if (user.isActivated()) {
-            logger.warn("Activation OTP rejected because the account is already active");
-            throw new AccountNotActivatedException("Account already activated");
+        User user = userRepository.findByEmail(sanitizedEmail).orElse(null);
+        if (user == null || user.isActivated()) {
+            logger.info("Activation OTP request completed without a deliverable challenge");
+            return;
         }
 
         otpService.issueOtp(sanitizedEmail, "activation");
@@ -135,15 +137,16 @@ public class UserService {
         String sanitizedEmail = email.trim().toLowerCase();
         logger.info("Processing a login request");
 
-        User user = userRepository.findByEmail(sanitizedEmail)
-                .orElseThrow(() -> {
-                    logger.warn("Login rejected");
-                    return new UserNotFoundException("User not found");
-                });
+        User user = userRepository.findByEmail(sanitizedEmail).orElse(null);
+        if (user == null) {
+            passwordEncoder.matches(password, dummyPasswordHash);
+            logger.warn("Login rejected");
+            throw new InvalidCredentialsException("Invalid email or password");
+        }
 
         if (!passwordEncoder.matches(password, user.getPasswd())) {
             logger.warn("Login rejected");
-            throw new InvalidCredentialsException("Invalid password");
+            throw new InvalidCredentialsException("Invalid email or password");
         }
 
         if (!user.isActivated()) {
@@ -188,11 +191,11 @@ public class UserService {
         String sanitizedEmail = email.trim().toLowerCase();
         logger.info("Processing a password-reset OTP request");
 
-        User user = userRepository.findByEmail(sanitizedEmail)
-                .orElseThrow(() -> {
-                    logger.warn("Password-reset OTP rejected");
-                    return new UserNotFoundException("User not found");
-                });
+        User user = userRepository.findByEmail(sanitizedEmail).orElse(null);
+        if (user == null) {
+            logger.info("Password-reset OTP request completed without a deliverable challenge");
+            return;
+        }
 
         otpService.issueOtp(sanitizedEmail, "forgot-password");
     }

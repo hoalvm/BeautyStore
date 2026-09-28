@@ -69,7 +69,8 @@ public class AuthController {
                 throw new IllegalArgumentException("Email is required");
             }
             userService.sendActivationOtp(email);
-            return ResponseEntity.ok(new AuthResponse(email, null, "OTP sent to your email for activation"));
+            return ResponseEntity.ok(new AuthResponse(email, null,
+                "Nếu tài khoản phù hợp, mã OTP kích hoạt sẽ được gửi tới email"));
         } catch (UserNotFoundException | AccountNotActivatedException | IllegalArgumentException e) {
             logger.warn("Activation OTP request rejected");
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
@@ -122,7 +123,8 @@ public class AuthController {
                 throw new IllegalArgumentException("Email is required");
             }
             userService.sendForgotPasswordOtp(email);
-            return ResponseEntity.ok(new AuthResponse(email, null, "OTP sent to your email"));
+            return ResponseEntity.ok(new AuthResponse(email, null,
+                "Nếu email tồn tại, mã OTP đặt lại mật khẩu sẽ được gửi"));
         } catch (UserNotFoundException | IllegalArgumentException e) {
             logger.warn("Password reset OTP request rejected");
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
