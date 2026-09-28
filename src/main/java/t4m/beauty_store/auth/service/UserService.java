@@ -16,6 +16,7 @@ import t4m.beauty_store.auth.repository.UserRepository;
 import t4m.beauty_store.auth.util.JwtUtil;
 import t4m.beauty_store.auth.exception.*;
 import t4m.beauty_store.config.StoreProperties;
+import t4m.beauty_store.auth.validation.PasswordPolicy;
 
 import lombok.RequiredArgsConstructor;
 
@@ -47,6 +48,7 @@ public class UserService {
      * Sends OTP for account activation.
      */
     public void register(RegisterRequest dto) {
+        PasswordPolicy.requireStrong(dto.getPassword());
         String sanitizedEmail = dto.getEmail().trim().toLowerCase();
         // Force all public registrations to ROLE_USER only
         String sanitizedRole = "ROLE_USER";
@@ -199,6 +201,7 @@ public class UserService {
      * Reset password with OTP.
      */
     public void resetPassword(String email, String otp, String newPassword) {
+        PasswordPolicy.requireStrong(newPassword);
         String sanitizedEmail = email.trim().toLowerCase();
         logger.info("Processing a password reset");
 
@@ -260,6 +263,7 @@ public class UserService {
      * Validates current password before updating to new password.
      */
     public void changePassword(String email, String currentPassword, String newPassword) {
+        PasswordPolicy.requireStrong(newPassword);
         String sanitizedEmail = email.trim().toLowerCase();
         logger.info("Processing an authenticated password change");
 
@@ -273,6 +277,10 @@ public class UserService {
         if (!passwordEncoder.matches(currentPassword, user.getPasswd())) {
             logger.warn("Password change rejected because the current password is invalid");
             throw new InvalidCredentialsException("Current password is incorrect");
+        }
+
+        if (passwordEncoder.matches(newPassword, user.getPasswd())) {
+            throw new IllegalArgumentException("Mật khẩu mới phải khác mật khẩu hiện tại");
         }
 
         // Update to new password

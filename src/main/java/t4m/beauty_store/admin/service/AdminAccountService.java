@@ -29,6 +29,7 @@ import t4m.beauty_store.config.StoreProperties;
 import t4m.beauty_store.review.repository.ReviewRepository;
 import t4m.beauty_store.returns.repository.ReturnRequestRepository;
 import t4m.beauty_store.voucher.repository.VoucherUsageRepository;
+import t4m.beauty_store.auth.validation.PasswordPolicy;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -166,6 +167,7 @@ public class AdminAccountService {
      */
     @Transactional
     public AccountDTO createAccount(AccountCreateRequest request) {
+        PasswordPolicy.requireStrong(request.getPassword());
         // Validate
         if (!request.getPassword().equals(request.getConfirmPassword())) {
             throw new IllegalArgumentException("Mật khẩu xác nhận không khớp");
@@ -239,11 +241,9 @@ public class AdminAccountService {
 
         // Update password if provided
         if (request.getPassword() != null && !request.getPassword().isEmpty()) {
+            PasswordPolicy.requireStrong(request.getPassword());
             if (!request.getPassword().equals(request.getConfirmPassword())) {
                 throw new IllegalArgumentException("Mật khẩu xác nhận không khớp");
-            }
-            if (request.getPassword().length() < 6) {
-                throw new IllegalArgumentException("Mật khẩu phải có ít nhất 6 ký tự");
             }
             user.setPasswd(passwordEncoder.encode(request.getPassword()));
             user.setAuthVersion(user.getAuthVersion() + 1);
