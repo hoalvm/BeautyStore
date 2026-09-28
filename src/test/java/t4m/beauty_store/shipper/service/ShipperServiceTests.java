@@ -9,6 +9,7 @@ import t4m.beauty_store.order.entity.OrderStatus;
 import t4m.beauty_store.order.repository.OrderRepository;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -25,6 +26,17 @@ class ShipperServiceTests {
         orderRepository = mock(OrderRepository.class);
         userRepository = mock(UserRepository.class);
         service = new ShipperService(orderRepository, userRepository);
+    }
+
+    @Test
+    void availableOrdersUseTheDedicatedOrderedQuery() {
+        Order newest = order(OrderStatus.PROCESSING, null);
+        when(orderRepository.findByStatusOrderByCreatedAtDesc(OrderStatus.PROCESSING))
+            .thenReturn(List.of(newest));
+
+        assertThat(service.getAvailableOrders()).containsExactly(newest);
+        verify(orderRepository).findByStatusOrderByCreatedAtDesc(OrderStatus.PROCESSING);
+        verify(orderRepository, never()).findByStatus(eq(OrderStatus.PROCESSING), any());
     }
 
     @Test
