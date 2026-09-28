@@ -23,6 +23,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class AdminVoucherServiceTests {
@@ -103,6 +104,15 @@ class AdminVoucherServiceTests {
         verify(voucherRepository).findByIdForUpdate(1L);
         verify(voucherRepository).delete(voucher);
         verify(voucherRepository, never()).findById(1L);
+    }
+
+    @Test
+    void listingRejectsUnboundedPageSizesBeforeQueryingTheDatabase() {
+        assertThatThrownBy(() -> service.getAllVouchers(
+            null, null, null, null, 0, 10_000, "createdAt", "desc"))
+            .isInstanceOf(IllegalArgumentException.class);
+
+        verifyNoInteractions(voucherRepository);
     }
 
     private static Voucher voucher(int usedQuantity) {

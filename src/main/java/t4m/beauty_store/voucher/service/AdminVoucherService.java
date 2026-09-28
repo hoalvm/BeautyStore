@@ -122,9 +122,22 @@ public class AdminVoucherService {
             String sortBy,
             String sortDir
     ) {
-        Sort sort = sortDir.equalsIgnoreCase("asc") 
-            ? Sort.by(sortBy).ascending() 
-            : Sort.by(sortBy).descending();
+        if (page < 0 || size < 1 || size > 100) {
+            throw new IllegalArgumentException("Phân trang không hợp lệ");
+        }
+        String sortProperty = switch (sortBy == null ? "" : sortBy) {
+            case "code" -> "code";
+            case "discountType" -> "discountType";
+            case "startDate" -> "startDate";
+            case "endDate" -> "endDate";
+            case "totalQuantity" -> "totalQuantity";
+            case "usedQuantity" -> "usedQuantity";
+            case "active" -> "active";
+            default -> "createdAt";
+        };
+        Sort sort = "asc".equalsIgnoreCase(sortDir)
+            ? Sort.by(sortProperty).ascending()
+            : Sort.by(sortProperty).descending();
         
         Pageable pageable = PageRequest.of(page, size, sort);
         

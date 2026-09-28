@@ -29,6 +29,7 @@ public class AdminProductController {
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "false") boolean includeInactive) {
+        validatePage(page, size);
         Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
         Page<Product> products = search == null || search.isBlank()
             ? productService.getAllProducts(pageable, includeInactive)
@@ -83,6 +84,7 @@ public class AdminProductController {
     public ResponseEntity<PageResponse<ProductResponse>> getOutOfStock(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
+        validatePage(page, size);
         return ResponseEntity.ok(PageResponse.from(productService.getOutOfStockProducts(PageRequest.of(page, size))
             .map(ProductResponse::fromEntity)));
     }
@@ -92,6 +94,7 @@ public class AdminProductController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "10") int threshold) {
+        validatePage(page, size);
         return ResponseEntity.ok(PageResponse.from(productService.getLowStockProducts(threshold, PageRequest.of(page, size))
             .map(ProductResponse::fromEntity)));
     }
@@ -101,7 +104,14 @@ public class AdminProductController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "0") int threshold) {
+        validatePage(page, size);
         return ResponseEntity.ok(PageResponse.from(productService.getInStockProducts(threshold, PageRequest.of(page, size))
             .map(ProductResponse::fromEntity)));
+    }
+
+    private static void validatePage(int page, int size) {
+        if (page < 0 || size < 1 || size > 100) {
+            throw new IllegalArgumentException("Phân trang không hợp lệ");
+        }
     }
 }

@@ -30,7 +30,9 @@ public class AdminOrderController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) OrderStatus status) {
-        
+        if (page < 0 || size < 1 || size > 100) {
+            throw new IllegalArgumentException("Phân trang không hợp lệ");
+        }
         Page<Order> orders;
         if (status != null) {
             orders = orderService.getOrdersByStatus(status, PageRequest.of(page, size, Sort.by("createdAt").descending()));
