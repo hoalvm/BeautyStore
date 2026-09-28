@@ -49,4 +49,13 @@ class JwtUtilTests {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("32");
     }
+
+    @Test
+    void rejectsTokenAfterAuthenticationVersionChanges() {
+        JwtUtil jwt = new JwtUtil(SECRET, Duration.ofMinutes(5));
+        String token = jwt.generateToken("customer@example.test", Set.of("ROLE_USER"), 3);
+
+        assertThat(jwt.isTokenValid(token, "customer@example.test", 3)).isTrue();
+        assertThat(jwt.isTokenValid(token, "customer@example.test", 4)).isFalse();
+    }
 }

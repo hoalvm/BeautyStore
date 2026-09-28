@@ -231,7 +231,10 @@ public class AdminAccountService {
         if (request.getRole() != null && !request.getRole().isEmpty()) {
             Role role = roleRepository.findByRname(request.getRole())
                 .orElseThrow(() -> new IllegalArgumentException("Vai trò không hợp lệ: " + request.getRole()));
+            boolean roleChanged = user.getRoles().stream()
+                .noneMatch(current -> current.getRname().equals(role.getRname()));
             user.setRoles(new HashSet<>(Collections.singletonList(role)));
+            if (roleChanged) user.setAuthVersion(user.getAuthVersion() + 1);
         }
 
         // Update password if provided
@@ -243,6 +246,7 @@ public class AdminAccountService {
                 throw new IllegalArgumentException("Mật khẩu phải có ít nhất 6 ký tự");
             }
             user.setPasswd(passwordEncoder.encode(request.getPassword()));
+            user.setAuthVersion(user.getAuthVersion() + 1);
         }
 
         User updatedUser = userRepository.save(user);
@@ -317,6 +321,7 @@ public class AdminAccountService {
         }
 
         user.setActivated(false);
+        user.setAuthVersion(user.getAuthVersion() + 1);
         user.setUpdated(LocalDateTime.now());
         userRepository.save(user);
         logger.info("Admin account deactivated: userId={}", user.getId());
@@ -331,6 +336,7 @@ public class AdminAccountService {
             .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy tài khoản với ID: " + id));
 
         user.setActivated(true);
+        user.setAuthVersion(user.getAuthVersion() + 1);
         user.setUpdated(LocalDateTime.now());
         userRepository.save(user);
         logger.info("Admin account reactivated: userId={}", user.getId());
@@ -376,6 +382,7 @@ public class AdminAccountService {
                 requireAnotherActiveAdmin(activeAdminIds(users));
                 users.forEach(user -> {
                     user.setActivated(false);
+                    user.setAuthVersion(user.getAuthVersion() + 1);
                     user.setUpdated(LocalDateTime.now());
                 });
                 userRepository.saveAll(users);
@@ -385,6 +392,7 @@ public class AdminAccountService {
             case "unban":
                 users.forEach(user -> {
                     user.setActivated(true);
+                    user.setAuthVersion(user.getAuthVersion() + 1);
                     user.setUpdated(LocalDateTime.now());
                 });
                 userRepository.saveAll(users);

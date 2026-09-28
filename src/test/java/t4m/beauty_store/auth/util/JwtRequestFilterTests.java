@@ -66,7 +66,7 @@ class JwtRequestFilterTests {
                 .build();
         when(jwtUtil.extractUsername("signed-token")).thenReturn("customer@example.com");
         when(userDetailsService.loadUserByUsername("customer@example.com")).thenReturn(user);
-        when(jwtUtil.isTokenValid("signed-token", "customer@example.com")).thenReturn(true);
+        when(jwtUtil.isTokenValid("signed-token", "customer@example.com", 0)).thenReturn(true);
 
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/auth/profile");
         request.addHeader("Authorization", "Bearer signed-token");
@@ -89,7 +89,7 @@ class JwtRequestFilterTests {
                 .build();
         when(jwtUtil.extractUsername("page-token")).thenReturn("admin@example.com");
         when(userDetailsService.loadUserByUsername("admin@example.com")).thenReturn(admin);
-        when(jwtUtil.isTokenValid("page-token", "admin@example.com")).thenReturn(true);
+        when(jwtUtil.isTokenValid("page-token", "admin@example.com", 0)).thenReturn(true);
 
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/admin");
         request.setCookies(new Cookie(AuthCookieService.COOKIE_NAME, "page-token"));
@@ -113,7 +113,7 @@ class JwtRequestFilterTests {
         when(jwtUtil.extractUsername("still-signed-token")).thenReturn("disabled@example.com");
         when(userDetailsService.loadUserByUsername("disabled@example.com"))
                 .thenReturn(disabledUser);
-        when(jwtUtil.isTokenValid("still-signed-token", "disabled@example.com"))
+        when(jwtUtil.isTokenValid("still-signed-token", "disabled@example.com", 0))
                 .thenReturn(true);
 
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/orders");

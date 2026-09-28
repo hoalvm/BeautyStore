@@ -82,7 +82,9 @@ public class JwtRequestFilter extends OncePerRequestFilter {
             }
             if (SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-                if (jwtUtil.isTokenValid(jwt, username) && isAccountUsable(userDetails)) {
+                int authVersion = userDetails instanceof t4m.beauty_store.auth.entity.User user
+                    ? user.getAuthVersion() : 0;
+                if (jwtUtil.isTokenValid(jwt, username, authVersion) && isAccountUsable(userDetails)) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);

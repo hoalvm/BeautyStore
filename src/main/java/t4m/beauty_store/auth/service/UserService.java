@@ -158,7 +158,7 @@ public class UserService {
                     .map(Role::getRname)
                     .findFirst()
                     .orElseThrow(() -> new InvalidRoleException("No role assigned to user"));
-            String token = jwtUtil.generateToken(sanitizedEmail, Set.of(role));
+            String token = jwtUtil.generateToken(sanitizedEmail, Set.of(role), user.getAuthVersion());
             logger.info("Login completed successfully");
             return token;
         } catch (Exception e) {
@@ -216,6 +216,7 @@ public class UserService {
 
         otpService.validateOtp(sanitizedEmail, otp, "forgot-password");
         user.setPasswd(passwordEncoder.encode(newPassword));
+        user.setAuthVersion(user.getAuthVersion() + 1);
         userRepository.save(user);
         logger.info("Password reset completed successfully");
     }
@@ -282,6 +283,7 @@ public class UserService {
 
         // Update to new password
         user.setPasswd(passwordEncoder.encode(newPassword));
+        user.setAuthVersion(user.getAuthVersion() + 1);
         userRepository.save(user);
         logger.info("Password changed successfully");
     }

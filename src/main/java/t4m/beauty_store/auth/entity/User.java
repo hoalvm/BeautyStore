@@ -44,6 +44,9 @@ public class User implements UserDetails {
     @Column(name = "updated")
     private LocalDateTime updated = LocalDateTime.now();
 
+    @Column(name = "auth_version", nullable = false)
+    private int authVersion = 0;
+
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(name = "user_role", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "role_id"))
     private Set<Role> roles = new HashSet<>();

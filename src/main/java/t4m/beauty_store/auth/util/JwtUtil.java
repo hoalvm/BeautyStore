@@ -29,8 +29,13 @@ public class JwtUtil {
     }
 
     public String generateToken(String username, Set<String> roles) {
+        return generateToken(username, roles, 0);
+    }
+
+    public String generateToken(String username, Set<String> roles, int authVersion) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("roles", roles);
+        claims.put("authVersion", authVersion);
         long now = System.currentTimeMillis();
         return Jwts.builder()
                 .claims(claims)
@@ -55,8 +60,16 @@ public class JwtUtil {
     }
 
     public boolean isTokenValid(String token, String username) {
+        return isTokenValid(token, username, 0);
+    }
+
+    public boolean isTokenValid(String token, String username, int expectedAuthVersion) {
         final String extractedUsername = extractUsername(token);
-        return (extractedUsername.equals(username) && !isTokenExpired(token));
+        Integer tokenVersion = extractClaim(token, claims -> claims.get("authVersion", Integer.class));
+        int normalizedVersion = tokenVersion == null ? 0 : tokenVersion;
+        return extractedUsername.equals(username)
+                && normalizedVersion == expectedAuthVersion
+                && !isTokenExpired(token);
     }
 
     private boolean isTokenExpired(String token) {
