@@ -87,19 +87,20 @@ public class AdminAccountService {
     @Transactional
     public AccountDTO createAccount(AccountCreateRequest request) {
         PasswordPolicy.requireStrong(request.getPassword());
+        String normalizedEmail = normalizeEmail(request.getEmail());
         // Validate
         if (!request.getPassword().equals(request.getConfirmPassword())) {
             throw new IllegalArgumentException("Mật khẩu xác nhận không khớp");
         }
 
         // Check if email exists
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+        if (userRepository.findByEmail(normalizedEmail).isPresent()) {
             throw new IllegalArgumentException("Email đã tồn tại trong hệ thống");
         }
 
         // Create user
         User user = new User();
-        user.setEmail(request.getEmail());
+        user.setEmail(normalizedEmail);
         user.setPasswd(passwordEncoder.encode(request.getPassword()));
         user.setName(request.getName());
         user.setPhone(request.getPhone());
@@ -133,6 +134,13 @@ public class AdminAccountService {
         User user = userRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy tài khoản với ID: " + id));
 
+        String normalizedEmail = normalizeEmail(request.getEmail());
+        userRepository.findByEmail(normalizedEmail)
+            .filter(existing -> !existing.getId().equals(id))
+            .ifPresent(existing -> {
+                throw new IllegalArgumentException("Email đã tồn tại trong hệ thống");
+            });
+
         String requestedRole = request.getRole();
         if (requestedRole != null && !requestedRole.isBlank()
                 && isAdmin(user) && !"ROLE_ADMIN".equals(requestedRole)) {
@@ -145,14 +153,14 @@ public class AdminAccountService {
         // Update basic info
         user.setName(request.getName());
         user.setPhone(request.getPhone());
-        user.setEmail(request.getEmail());
+        user.setEmail(normalizedEmail);
         user.setUpdated(storeTime.currentDateTime());
 
         // Update role if provided
         if (request.getRole() != null && !request.getRole().isEmpty()) {
             Role role = roleRepository.findByRname(request.getRole())
                 .orElseThrow(() -> new IllegalArgumentException("Vai trò không hợp lệ: " + request.getRole()));
-            boolean roleChanged = user.getRoles().stream()
+            boolean roleChanged = user.getRoles().size() != 1 || user.getRoles().stream()
                 .noneMatch(current -> current.getRname().equals(role.getRname()));
             user.setRoles(new HashSet<>(Collections.singletonList(role)));
             if (roleChanged) user.setAuthVersion(user.getAuthVersion() + 1);
@@ -374,6 +382,10 @@ public class AdminAccountService {
 
     private static String clean(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private static String normalizeEmail(String value) {
+        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
     }
 
     private static String normalizeStatus(String value) {

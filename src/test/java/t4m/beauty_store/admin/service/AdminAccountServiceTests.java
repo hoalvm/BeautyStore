@@ -190,6 +190,52 @@ class AdminAccountServiceTests {
     }
 
     @Test
+    void removingOneOfMultipleRolesRevokesExistingTokens() {
+        User target = user(8L, "staff@beautystore.vn", true, "ROLE_USER");
+        Role admin = new Role();
+        admin.setId(999L);
+        admin.setRname("ROLE_ADMIN");
+        target.setRoles(new java.util.HashSet<>(Set.of(
+            target.getRoles().iterator().next(), admin)));
+        AccountUpdateRequest request = new AccountUpdateRequest();
+        request.setName("Staff");
+        request.setEmail(" STAFF@BeautyStore.vn ");
+        request.setRole("ROLE_USER");
+        Role userRole = target.getRoles().stream()
+            .filter(role -> "ROLE_USER".equals(role.getRname())).findFirst().orElseThrow();
+        User otherAdmin = user(10L, "operator@beautystore.vn", true, "ROLE_ADMIN");
+        when(userRepository.findById(8L)).thenReturn(Optional.of(target));
+        when(userRepository.findByEmail("staff@beautystore.vn")).thenReturn(Optional.of(target));
+        when(userRepository.findAdministratorsForUpdate()).thenReturn(List.of(target, otherAdmin));
+        when(roleRepository.findByRname("ROLE_USER")).thenReturn(Optional.of(userRole));
+        when(userRepository.save(target)).thenReturn(target);
+
+        service.updateAccount(8L, request, "operator@beautystore.vn");
+
+        assertThat(target.getEmail()).isEqualTo("staff@beautystore.vn");
+        assertThat(target.getRoles()).extracting(Role::getRname).containsExactly("ROLE_USER");
+        assertThat(target.getAuthVersion()).isEqualTo(1);
+    }
+
+    @Test
+    void accountUpdateRejectsAnotherUsersEmailBeforeSaving() {
+        User target = user(8L, "first@beautystore.vn", true, "ROLE_USER");
+        User existing = user(9L, "taken@beautystore.vn", true, "ROLE_USER");
+        AccountUpdateRequest request = new AccountUpdateRequest();
+        request.setName("First");
+        request.setEmail(" TAKEN@BeautyStore.vn ");
+        when(userRepository.findById(8L)).thenReturn(Optional.of(target));
+        when(userRepository.findByEmail("taken@beautystore.vn")).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> service.updateAccount(
+                8L, request, "operator@beautystore.vn"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Email");
+
+        verify(userRepository, never()).save(target);
+    }
+
+    @Test
     void bulkBanCannotIncludeAuthenticatedAdmin() {
         User actor = user(1L, "admin@beautystore.vn", true, "ROLE_ADMIN");
         User customer = user(2L, "customer@beautystore.vn", true, "ROLE_USER");
