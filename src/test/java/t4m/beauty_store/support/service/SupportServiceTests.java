@@ -3,6 +3,8 @@ package t4m.beauty_store.support.service;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.server.ResponseStatusException;
+import t4m.beauty_store.config.ApiException;
+import t4m.beauty_store.config.StoreTime;
 import t4m.beauty_store.auth.entity.Role;
 import t4m.beauty_store.auth.entity.User;
 import t4m.beauty_store.support.entity.SupportMessage;
@@ -10,6 +12,8 @@ import t4m.beauty_store.support.entity.SupportSession;
 import t4m.beauty_store.support.repository.SupportMessageRepository;
 import t4m.beauty_store.support.repository.SupportSessionRepository;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -28,7 +32,7 @@ class SupportServiceTests {
     void setUp() {
         sessionRepository = mock(SupportSessionRepository.class);
         messageRepository = mock(SupportMessageRepository.class);
-        service = new SupportService(sessionRepository, messageRepository);
+        service = new SupportService(sessionRepository, messageRepository, fixedTime());
         when(sessionRepository.save(any(SupportSession.class)))
             .thenAnswer(invocation -> invocation.getArgument(0));
         when(messageRepository.save(any(SupportMessage.class)))
@@ -80,7 +84,7 @@ class SupportServiceTests {
         SupportSession session = guestSession("session-1", "owner-hash");
         session.setUserEmail("owner@example.com");
         session.setUserName("Khách an toàn");
-        when(sessionRepository.findBySessionId("session-1")).thenReturn(Optional.of(session));
+        when(sessionRepository.findBySessionIdForUpdate("session-1")).thenReturn(Optional.of(session));
 
         SupportMessage saved = service.saveCustomerMessage(
             "session-1", null, "owner-hash", "  Xin tư vấn kem chống nắng  ");
@@ -95,7 +99,7 @@ class SupportServiceTests {
     @Test
     void adminMessageCannotOverrideSenderIdentity() {
         SupportSession session = guestSession("session-1", "owner-hash");
-        when(sessionRepository.findBySessionId("session-1")).thenReturn(Optional.of(session));
+        when(sessionRepository.findBySessionIdForUpdate("session-1")).thenReturn(Optional.of(session));
 
         SupportMessage saved = service.saveAdminMessage("session-1", "  BeautyStore xin chào  ");
 
@@ -120,16 +124,30 @@ class SupportServiceTests {
     void closedSessionRejectsNewMessagesUntilReopened() {
         SupportSession session = guestSession("session-1", "owner-hash");
         session.setStatus("CLOSED");
-        when(sessionRepository.findBySessionId("session-1")).thenReturn(Optional.of(session));
+        when(sessionRepository.findBySessionIdForUpdate("session-1")).thenReturn(Optional.of(session));
 
         assertThatThrownBy(() -> service.saveCustomerMessage(
             "session-1", null, "owner-hash", "Tin nhắn mới"))
-            .isInstanceOf(IllegalStateException.class)
+            .isInstanceOf(ApiException.class)
             .hasMessageContaining("đã đóng");
         assertThatThrownBy(() -> service.saveAdminMessage("session-1", "Phản hồi mới"))
-            .isInstanceOf(IllegalStateException.class)
+            .isInstanceOf(ApiException.class)
             .hasMessageContaining("đã đóng");
         verifyNoInteractions(messageRepository);
+    }
+
+    @Test
+    void customerMessageLocksSessionBeforeIncrementingUnreadCount() {
+        SupportSession session = guestSession("session-locked", "owner-hash");
+        session.setUnreadCount(4);
+        when(sessionRepository.findBySessionIdForUpdate("session-locked"))
+            .thenReturn(Optional.of(session));
+
+        service.saveCustomerMessage("session-locked", null, "owner-hash", "Tin nhắn");
+
+        assertThat(session.getUnreadCount()).isEqualTo(5);
+        verify(sessionRepository).findBySessionIdForUpdate("session-locked");
+        verify(sessionRepository).save(session);
     }
 
     private static SupportSession guestSession(String sessionId, String hash) {
@@ -149,5 +167,9 @@ class SupportServiceTests {
             user.setRoles(Set.of(role));
         }
         return user;
+    }
+
+    private static StoreTime fixedTime() {
+        return new StoreTime(Clock.fixed(Instant.parse("2026-06-15T03:00:00Z"), StoreTime.ZONE));
     }
 }

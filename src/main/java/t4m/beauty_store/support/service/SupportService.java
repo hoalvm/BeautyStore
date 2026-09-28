@@ -3,6 +3,8 @@ package t4m.beauty_store.support.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import t4m.beauty_store.config.ApiException;
+import t4m.beauty_store.config.StoreTime;
 import t4m.beauty_store.support.dto.SupportSessionDto;
 import t4m.beauty_store.support.dto.SupportMessageResponse;
 import t4m.beauty_store.support.entity.SupportMessage;
@@ -11,7 +13,6 @@ import t4m.beauty_store.auth.entity.User;
 import t4m.beauty_store.support.repository.SupportMessageRepository;
 import t4m.beauty_store.support.repository.SupportSessionRepository;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -22,6 +23,7 @@ public class SupportService {
 
     private final SupportSessionRepository sessionRepository;
     private final SupportMessageRepository messageRepository;
+    private final StoreTime storeTime;
 
     @Transactional
     public SupportSession createOrGetSession(Long userId, String userEmail, String userName) {
@@ -37,7 +39,7 @@ public class SupportService {
                 });
         if (!"ACTIVE".equals(session.getStatus())) {
             session.setStatus("ACTIVE");
-            session.setUpdatedAt(LocalDateTime.now());
+            session.setUpdatedAt(storeTime.currentDateTime());
             session = sessionRepository.save(session);
         }
         return session;
@@ -60,7 +62,7 @@ public class SupportService {
             });
         if (!"ACTIVE".equals(session.getStatus())) {
             session.setStatus("ACTIVE");
-            session.setUpdatedAt(LocalDateTime.now());
+            session.setUpdatedAt(storeTime.currentDateTime());
             session = sessionRepository.save(session);
         }
         return session;
@@ -82,7 +84,7 @@ public class SupportService {
     @Transactional
     public SupportMessage saveCustomerMessage(
             String sessionId, User viewer, String guestTokenHash, String text) {
-        SupportSession session = requireAuthorizedSession(sessionId, viewer, guestTokenHash);
+        SupportSession session = requireAuthorizedSessionForUpdate(sessionId, viewer, guestTokenHash);
         requireActive(session);
         String messageText = clean(text, 2000);
         if (messageText == null) throw new IllegalArgumentException("Tin nhắn không được để trống");
@@ -93,9 +95,9 @@ public class SupportService {
         message.setUserName(session.getUserName());
         message.setSenderType("USER");
         message.setMessage(messageText);
-        message.setCreatedAt(LocalDateTime.now());
+        message.setCreatedAt(storeTime.currentDateTime());
         SupportMessage saved = messageRepository.save(message);
-        session.setUpdatedAt(LocalDateTime.now());
+        session.setUpdatedAt(storeTime.currentDateTime());
         session.setUnreadCount(session.getUnreadCount() + 1);
         sessionRepository.save(session);
         return saved;
@@ -103,8 +105,8 @@ public class SupportService {
 
     @Transactional
     public SupportMessage saveAdminMessage(String sessionId, String text) {
-        SupportSession session = sessionRepository.findBySessionId(sessionId)
-            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy phiên hỗ trợ"));
+        SupportSession session = sessionRepository.findBySessionIdForUpdate(sessionId)
+            .orElseThrow(() -> ApiException.notFound("Không tìm thấy phiên hỗ trợ"));
         requireActive(session);
         String messageText = clean(text, 2000);
         if (messageText == null) {
@@ -117,9 +119,9 @@ public class SupportService {
         message.setUserName("Chuyên viên BeautyStore");
         message.setSenderType("ADMIN");
         message.setMessage(messageText);
-        message.setCreatedAt(LocalDateTime.now());
+        message.setCreatedAt(storeTime.currentDateTime());
         SupportMessage saved = messageRepository.save(message);
-        session.setUpdatedAt(LocalDateTime.now());
+        session.setUpdatedAt(storeTime.currentDateTime());
         sessionRepository.save(session);
         return saved;
     }
@@ -135,27 +137,19 @@ public class SupportService {
 
     @Transactional
     public void markMessagesAsRead(String sessionId, String senderType) {
-        List<SupportMessage> messages = messageRepository.findBySessionIdAndIsReadFalse(sessionId);
-        messages.stream()
-                .filter(msg -> !msg.getSenderType().equals(senderType))
-                .forEach(msg -> msg.setRead(true));
-        messageRepository.saveAll(messages);
-
-        // Reset unread count
-        sessionRepository.findBySessionId(sessionId)
-                .ifPresent(session -> {
-                    session.setUnreadCount(0);
-                    sessionRepository.save(session);
-                });
+        SupportSession session = sessionRepository.findBySessionIdForUpdate(sessionId)
+            .orElseThrow(() -> ApiException.notFound("Không tìm thấy phiên hỗ trợ"));
+        messageRepository.markUnreadFromOtherSenderAsRead(sessionId, senderType);
+        if ("ADMIN".equals(senderType)) {
+            session.setUnreadCount(0);
+            sessionRepository.save(session);
+        }
     }
 
     @Transactional
     public void markCustomerViewRead(String sessionId, User viewer, String guestTokenHash) {
-        SupportSession session = requireAuthorizedSession(sessionId, viewer, guestTokenHash);
-        List<SupportMessage> messages = messageRepository.findBySessionIdAndIsReadFalse(session.getSessionId());
-        messages.stream().filter(message -> "ADMIN".equals(message.getSenderType()))
-            .forEach(message -> message.setRead(true));
-        messageRepository.saveAll(messages);
+        SupportSession session = requireAuthorizedSessionForUpdate(sessionId, viewer, guestTokenHash);
+        messageRepository.markUnreadFromOtherSenderAsRead(session.getSessionId(), "USER");
     }
 
     @Transactional(readOnly = true)
@@ -166,9 +160,10 @@ public class SupportService {
 
     @Transactional
     public void closeSession(String sessionId) {
-        sessionRepository.findBySessionId(sessionId)
+        sessionRepository.findBySessionIdForUpdate(sessionId)
                 .ifPresent(session -> {
                     session.setStatus("CLOSED");
+                    session.setUpdatedAt(storeTime.currentDateTime());
                     sessionRepository.save(session);
                 });
     }
@@ -189,19 +184,29 @@ public class SupportService {
         dto.setUpdatedAt(session.getUpdatedAt());
         dto.setUnreadCount(session.getUnreadCount());
 
-        // Get last message
-        List<SupportMessage> messages = messageRepository.findBySessionIdOrderByCreatedAtAsc(session.getSessionId());
-        if (!messages.isEmpty()) {
-            dto.setLastMessage(messages.get(messages.size() - 1).getMessage());
-        }
+        messageRepository.findTopBySessionIdOrderByCreatedAtDescIdDesc(session.getSessionId())
+            .ifPresent(message -> dto.setLastMessage(message.getMessage()));
 
         return dto;
     }
 
     private SupportSession requireAuthorizedSession(String sessionId, User viewer, String guestTokenHash) {
         SupportSession session = sessionRepository.findBySessionId(sessionId)
-            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy phiên hỗ trợ"));
-        if (viewer != null && isAdmin(viewer)) return session;
+            .orElseThrow(() -> ApiException.notFound("Không tìm thấy phiên hỗ trợ"));
+        authorize(session, viewer, guestTokenHash);
+        return session;
+    }
+
+    private SupportSession requireAuthorizedSessionForUpdate(
+            String sessionId, User viewer, String guestTokenHash) {
+        SupportSession session = sessionRepository.findBySessionIdForUpdate(sessionId)
+            .orElseThrow(() -> ApiException.notFound("Không tìm thấy phiên hỗ trợ"));
+        authorize(session, viewer, guestTokenHash);
+        return session;
+    }
+
+    private static void authorize(SupportSession session, User viewer, String guestTokenHash) {
+        if (viewer != null && isAdmin(viewer)) return;
         boolean memberOwner = viewer != null && session.getUserId() != null
             && session.getUserId().equals(viewer.getId());
         boolean guestOwner = viewer == null && guestTokenHash != null
@@ -210,7 +215,6 @@ public class SupportService {
             throw new org.springframework.web.server.ResponseStatusException(
                 org.springframework.http.HttpStatus.FORBIDDEN, "Bạn không có quyền truy cập phiên hỗ trợ này");
         }
-        return session;
     }
 
     private static boolean isAdmin(User user) {
@@ -220,7 +224,7 @@ public class SupportService {
 
     private static void requireActive(SupportSession session) {
         if (!"ACTIVE".equals(session.getStatus())) {
-            throw new IllegalStateException("Phiên hỗ trợ đã đóng; vui lòng mở một phiên mới");
+            throw ApiException.conflict("Phiên hỗ trợ đã đóng; vui lòng mở một phiên mới");
         }
     }
 

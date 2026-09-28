@@ -15,6 +15,7 @@ import t4m.beauty_store.order.entity.OrderStatus;
 import java.util.List;
 import java.util.Optional;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
@@ -47,7 +48,17 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     // Admin methods
     @EntityGraph(attributePaths = {"orderItems", "shipper"})
     Page<Order> findByStatus(OrderStatus status, Pageable pageable);
+    @EntityGraph(attributePaths = {"orderItems", "shipper"})
+    List<Order> findByStatusOrderByCreatedAtDesc(OrderStatus status);
     long countByStatus(OrderStatus status);
+
+    @Query("select coalesce(sum(o.totalAmount), 0) from Order o where o.status = t4m.beauty_store.order.entity.OrderStatus.DELIVERED")
+    BigDecimal sumDeliveredRevenue();
+
+    @Query("select coalesce(sum(o.totalAmount), 0) from Order o where o.status = t4m.beauty_store.order.entity.OrderStatus.DELIVERED and o.createdAt >= :from and o.createdAt < :to")
+    BigDecimal sumDeliveredRevenueBetween(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+    long countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(LocalDateTime from, LocalDateTime to);
     
     // Shipper methods
     @EntityGraph(attributePaths = {"orderItems", "shipper"})

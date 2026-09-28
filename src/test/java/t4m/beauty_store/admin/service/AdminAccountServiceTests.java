@@ -7,6 +7,9 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import t4m.beauty_store.admin.dto.AccountUpdateRequest;
 import t4m.beauty_store.admin.dto.BulkActionRequest;
 import t4m.beauty_store.auth.entity.Role;
@@ -17,6 +20,7 @@ import t4m.beauty_store.auth.service.EmailService;
 import t4m.beauty_store.auth.service.OtpService;
 import t4m.beauty_store.cart.repository.CartRepository;
 import t4m.beauty_store.config.StoreProperties;
+import t4m.beauty_store.config.StoreTime;
 import t4m.beauty_store.favorite.repository.FavoriteRepository;
 import t4m.beauty_store.order.repository.OrderRepository;
 import t4m.beauty_store.rating.repository.RatingRepository;
@@ -24,11 +28,14 @@ import t4m.beauty_store.review.repository.ReviewRepository;
 import t4m.beauty_store.returns.repository.ReturnRequestRepository;
 import t4m.beauty_store.voucher.repository.VoucherUsageRepository;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -67,37 +74,35 @@ class AdminAccountServiceTests {
 
     @BeforeEach
     void setUp() {
-        service = new AdminAccountService();
-        setField("userRepository", userRepository);
-        setField("roleRepository", roleRepository);
-        setField("passwordEncoder", passwordEncoder);
-        setField("emailService", emailService);
-        setField("otpService", otpService);
-        setField("orderRepository", orderRepository);
-        setField("cartRepository", cartRepository);
-        setField("favoriteRepository", favoriteRepository);
-        setField("ratingRepository", ratingRepository);
-        setField("reviewRepository", reviewRepository);
-        setField("returnRequestRepository", returnRequestRepository);
-        setField("voucherUsageRepository", voucherUsageRepository);
-        setField("storeProperties", new StoreProperties());
+        service = new AdminAccountService(userRepository, roleRepository, passwordEncoder,
+            emailService, otpService, orderRepository, cartRepository, favoriteRepository,
+            ratingRepository, reviewRepository, returnRequestRepository, voucherUsageRepository,
+            new StoreProperties(), fixedTime());
     }
 
     @Test
     void adminPasswordResetCreatesStoresAndSendsPublicResetOtp() {
         User user = user(7L, "customer@example.com", true, "ROLE_USER");
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
-        when(otpService.generateOtp()).thenReturn("123456");
-
         service.resetPassword(7L);
 
-        InOrder otpFlow = inOrder(otpService);
-        otpFlow.verify(otpService).generateOtp();
-        otpFlow.verify(otpService).storeOtp(
-            "customer@example.com", "123456", "forgot-password");
-        otpFlow.verify(otpService).sendOtpEmail(
-            "customer@example.com", "123456", "Password Reset");
+        verify(otpService).issueOtp("customer@example.com", "forgot-password");
         verifyNoInteractions(emailService);
+    }
+
+    @Test
+    void accountListingUsesRepositoryPaginationAndStatusFilter() {
+        User customer = user(7L, "customer@example.com", true, "ROLE_USER");
+        var pageable = PageRequest.of(1, 20, Sort.by("email").ascending());
+        when(userRepository.findAdminPage("customer", "ROLE_USER", "active", pageable))
+            .thenReturn(new PageImpl<>(List.of(customer), pageable, 21));
+
+        var result = service.getAccounts(" customer ", "ROLE_USER", "ACTIVE",
+            1, 20, "email", "asc");
+
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getTotalElements()).isEqualTo(21);
+        verify(userRepository, never()).findAll();
     }
 
     @Test
@@ -181,6 +186,52 @@ class AdminAccountServiceTests {
             .hasMessageContaining("quản trị viên");
 
         verifyNoInteractions(roleRepository);
+        verify(userRepository, never()).save(target);
+    }
+
+    @Test
+    void removingOneOfMultipleRolesRevokesExistingTokens() {
+        User target = user(8L, "staff@beautystore.vn", true, "ROLE_USER");
+        Role admin = new Role();
+        admin.setId(999L);
+        admin.setRname("ROLE_ADMIN");
+        target.setRoles(new java.util.HashSet<>(Set.of(
+            target.getRoles().iterator().next(), admin)));
+        AccountUpdateRequest request = new AccountUpdateRequest();
+        request.setName("Staff");
+        request.setEmail(" STAFF@BeautyStore.vn ");
+        request.setRole("ROLE_USER");
+        Role userRole = target.getRoles().stream()
+            .filter(role -> "ROLE_USER".equals(role.getRname())).findFirst().orElseThrow();
+        User otherAdmin = user(10L, "operator@beautystore.vn", true, "ROLE_ADMIN");
+        when(userRepository.findById(8L)).thenReturn(Optional.of(target));
+        when(userRepository.findByEmail("staff@beautystore.vn")).thenReturn(Optional.of(target));
+        when(userRepository.findAdministratorsForUpdate()).thenReturn(List.of(target, otherAdmin));
+        when(roleRepository.findByRname("ROLE_USER")).thenReturn(Optional.of(userRole));
+        when(userRepository.save(target)).thenReturn(target);
+
+        service.updateAccount(8L, request, "operator@beautystore.vn");
+
+        assertThat(target.getEmail()).isEqualTo("staff@beautystore.vn");
+        assertThat(target.getRoles()).extracting(Role::getRname).containsExactly("ROLE_USER");
+        assertThat(target.getAuthVersion()).isEqualTo(1);
+    }
+
+    @Test
+    void accountUpdateRejectsAnotherUsersEmailBeforeSaving() {
+        User target = user(8L, "first@beautystore.vn", true, "ROLE_USER");
+        User existing = user(9L, "taken@beautystore.vn", true, "ROLE_USER");
+        AccountUpdateRequest request = new AccountUpdateRequest();
+        request.setName("First");
+        request.setEmail(" TAKEN@BeautyStore.vn ");
+        when(userRepository.findById(8L)).thenReturn(Optional.of(target));
+        when(userRepository.findByEmail("taken@beautystore.vn")).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> service.updateAccount(
+                8L, request, "operator@beautystore.vn"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Email");
+
         verify(userRepository, never()).save(target);
     }
 
@@ -321,13 +372,8 @@ class AdminAccountServiceTests {
         return user;
     }
 
-    private void setField(String name, Object value) {
-        try {
-            var field = AdminAccountService.class.getDeclaredField(name);
-            field.setAccessible(true);
-            field.set(service, value);
-        } catch (ReflectiveOperationException exception) {
-            throw new AssertionError("Cannot inject test dependency " + name, exception);
-        }
+    private static StoreTime fixedTime() {
+        return new StoreTime(Clock.fixed(Instant.parse("2026-06-15T03:00:00Z"), StoreTime.ZONE));
     }
+
 }

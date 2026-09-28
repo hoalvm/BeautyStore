@@ -1,6 +1,10 @@
 package t4m.beauty_store.auth.service;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.mockito.ArgumentCaptor;
+
+import java.util.concurrent.CompletableFuture;
 import t4m.beauty_store.auth.exception.OtpExpiredException;
 import t4m.beauty_store.auth.exception.OtpInvalidException;
 import t4m.beauty_store.auth.exception.OtpRateLimitException;
@@ -8,10 +12,13 @@ import t4m.beauty_store.auth.exception.OtpRateLimitException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class OtpServiceTests {
 
-    private final OtpService service = new OtpService(mock(EmailService.class));
+    private final OtpService service = new OtpService(
+        mock(EmailService.class), new BCryptPasswordEncoder(4));
 
     @Test
     void generatesSixDigitCryptographicChallengeShape() {
@@ -55,5 +62,25 @@ class OtpServiceTests {
         assertThatThrownBy(() ->
                 service.storeOtp("customer@example.com", "654321", "activation"))
                 .isInstanceOf(OtpRateLimitException.class);
+    }
+
+    @Test
+    void invalidatesChallengeWhenEmailDeliveryFails() {
+        EmailService email = mock(EmailService.class);
+        CompletableFuture<Void> failure = new CompletableFuture<>();
+        when(email.sendOtpEmail(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(failure);
+        OtpService otp = new OtpService(email, new BCryptPasswordEncoder(4));
+
+        otp.issueOtp("customer@example.com", "activation");
+        ArgumentCaptor<String> code = ArgumentCaptor.forClass(String.class);
+        verify(email).sendOtpEmail(org.mockito.ArgumentMatchers.eq("customer@example.com"),
+                code.capture(), org.mockito.ArgumentMatchers.anyString());
+        failure.completeExceptionally(new IllegalStateException("mail unavailable"));
+
+        assertThatThrownBy(() -> otp.validateOtp(
+                "customer@example.com", code.getValue(), "activation"))
+                .isInstanceOf(OtpExpiredException.class);
     }
 }

@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import t4m.beauty_store.returns.dto.ReturnResponse;
 import t4m.beauty_store.returns.entity.ReturnStatus;
 import t4m.beauty_store.returns.service.ReturnService;
+import t4m.beauty_store.config.PageResponse;
 
 import java.util.Set;
 
@@ -22,12 +23,12 @@ public class AdminReturnController {
     private final ReturnService returnService;
 
     @GetMapping
-    public ResponseEntity<Page<ReturnResponse>> list(
+    public ResponseEntity<PageResponse<ReturnResponse>> list(
             @RequestParam(required = false) ReturnStatus status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return ResponseEntity.ok(returnService.adminList(status,
-            PageRequest.of(Math.max(0, page), Math.max(1, Math.min(size, 100)))));
+        return ResponseEntity.ok(PageResponse.from(returnService.adminList(status,
+            PageRequest.of(Math.max(0, page), Math.max(1, Math.min(size, 100))))));
     }
 
     @PatchMapping("/{id}/status")

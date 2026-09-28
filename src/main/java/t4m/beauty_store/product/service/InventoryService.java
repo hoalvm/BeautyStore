@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import t4m.beauty_store.admin.dto.InventoryBatchRequest;
 import t4m.beauty_store.config.StoreTime;
+import t4m.beauty_store.config.ApiException;
 import t4m.beauty_store.product.entity.InventoryBatch;
 import t4m.beauty_store.product.entity.ProductVariant;
 import t4m.beauty_store.product.repository.InventoryBatchRepository;
@@ -66,7 +67,7 @@ public class InventoryService {
 
     @Transactional
     public InventoryBatch updateBatch(Long id, InventoryBatchRequest request) {
-        InventoryBatch batch = batchRepository.findById(id)
+        InventoryBatch batch = batchRepository.findByIdForUpdate(id)
             .orElseThrow(() -> new IllegalArgumentException("Inventory batch not found"));
         validateRequest(request, false);
         String code = normalizeCode(request.getBatchCode());
@@ -77,6 +78,16 @@ public class InventoryService {
         int reserved = batch.getQuantityReserved();
         if (reserved > request.getQuantityOnHand()) {
             throw new IllegalArgumentException("Reserved quantity cannot exceed on-hand quantity");
+        }
+        boolean requestedActive = request.getActive() == null ? Boolean.TRUE.equals(batch.getActive()) : request.getActive();
+        if (reserved > 0 && (!code.equalsIgnoreCase(batch.getBatchCode())
+                || !Objects.equals(request.getExpiryDate(), batch.getExpiryDate())
+                || requestedActive != Boolean.TRUE.equals(batch.getActive())
+                || request.getQuantityOnHand() < batch.getQuantityOnHand())) {
+            throw ApiException.conflict("Không thể thay đổi thông tin lô đang giữ tồn cho đơn hàng");
+        }
+        if (requestedActive && request.getExpiryDate().isBefore(StoreTime.today())) {
+            throw new IllegalArgumentException("Không thể kích hoạt lô đã hết hạn");
         }
         batch.setBatchCode(code);
         batch.setManufacturedDate(request.getManufacturedDate());
@@ -89,8 +100,15 @@ public class InventoryService {
 
     @Transactional
     public InventoryBatch setBatchActive(Long id, boolean active) {
-        InventoryBatch batch = batchRepository.findById(id)
+        InventoryBatch batch = batchRepository.findByIdForUpdate(id)
             .orElseThrow(() -> new IllegalArgumentException("Inventory batch not found"));
+        if (Boolean.TRUE.equals(batch.getActive()) == active) return batch;
+        if (batch.getQuantityReserved() > 0) {
+            throw ApiException.conflict("Không thể đổi trạng thái lô đang giữ tồn cho đơn hàng");
+        }
+        if (active && (batch.getExpiryDate() == null || batch.getExpiryDate().isBefore(StoreTime.today()))) {
+            throw new IllegalArgumentException("Không thể kích hoạt lô đã hết hạn");
+        }
         batch.setActive(active);
         return batchRepository.save(batch);
     }

@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.core.Authentication;
 import t4m.beauty_store.auth.dto.AuthResponse;
+import t4m.beauty_store.auth.dto.ChangePasswordRequest;
 import t4m.beauty_store.auth.dto.LoginRequest;
 import t4m.beauty_store.auth.dto.RegisterRequest;
 import t4m.beauty_store.auth.dto.OtpRequest;
@@ -68,7 +69,8 @@ public class AuthController {
                 throw new IllegalArgumentException("Email is required");
             }
             userService.sendActivationOtp(email);
-            return ResponseEntity.ok(new AuthResponse(email, null, "OTP sent to your email for activation"));
+            return ResponseEntity.ok(new AuthResponse(email, null,
+                "Nếu tài khoản phù hợp, mã OTP kích hoạt sẽ được gửi tới email"));
         } catch (UserNotFoundException | AccountNotActivatedException | IllegalArgumentException e) {
             logger.warn("Activation OTP request rejected");
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
@@ -121,7 +123,8 @@ public class AuthController {
                 throw new IllegalArgumentException("Email is required");
             }
             userService.sendForgotPasswordOtp(email);
-            return ResponseEntity.ok(new AuthResponse(email, null, "OTP sent to your email"));
+            return ResponseEntity.ok(new AuthResponse(email, null,
+                "Nếu email tồn tại, mã OTP đặt lại mật khẩu sẽ được gửi"));
         } catch (UserNotFoundException | IllegalArgumentException e) {
             logger.warn("Password reset OTP request rejected");
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
@@ -185,21 +188,10 @@ public class AuthController {
     @PostMapping("/change-password")
     public ResponseEntity<?> changePassword(
             Authentication authentication,
-            @RequestBody Map<String, String> request) {
+            @Valid @RequestBody ChangePasswordRequest request) {
         String email = authentication.getName();
         try {
-            String currentPassword = request.get("currentPassword");
-            String newPassword = request.get("newPassword");
-            
-            if (currentPassword == null || newPassword == null) {
-                throw new IllegalArgumentException("Mật khẩu hiện tại và mật khẩu mới là bắt buộc");
-            }
-            
-            if (newPassword.length() < 6) {
-                throw new IllegalArgumentException("Mật khẩu mới phải có ít nhất 6 ký tự");
-            }
-            
-            userService.changePassword(email, currentPassword, newPassword);
+            userService.changePassword(email, request.getCurrentPassword(), request.getNewPassword());
             
             return ResponseEntity.ok(Map.of(
                 "message", "Password changed successfully",

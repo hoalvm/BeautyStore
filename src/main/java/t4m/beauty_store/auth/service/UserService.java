@@ -16,8 +16,10 @@ import t4m.beauty_store.auth.repository.UserRepository;
 import t4m.beauty_store.auth.util.JwtUtil;
 import t4m.beauty_store.auth.exception.*;
 import t4m.beauty_store.config.StoreProperties;
+import t4m.beauty_store.auth.validation.PasswordPolicy;
 
 import lombok.RequiredArgsConstructor;
+import jakarta.annotation.PostConstruct;
 
 import java.util.List;
 import java.util.Set;
@@ -35,6 +37,12 @@ public class UserService {
     private final OtpService otpService;
     private final EmailService emailService;
     private final StoreProperties storeProperties;
+    private String dummyPasswordHash;
+
+    @PostConstruct
+    void initializeDummyPasswordHash() {
+        dummyPasswordHash = passwordEncoder.encode("beautystore-dummy-password");
+    }
 
     private final Cache<String, Role> roleCache = Caffeine.newBuilder()
             .expireAfterWrite(1, TimeUnit.HOURS)
@@ -47,6 +55,7 @@ public class UserService {
      * Sends OTP for account activation.
      */
     public void register(RegisterRequest dto) {
+        PasswordPolicy.requireStrong(dto.getPassword());
         String sanitizedEmail = dto.getEmail().trim().toLowerCase();
         // Force all public registrations to ROLE_USER only
         String sanitizedRole = "ROLE_USER";
@@ -73,9 +82,7 @@ public class UserService {
         userRepository.save(user);
         logger.info("Customer registered and is pending activation");
 
-        String otp = otpService.generateOtp();
-        otpService.storeOtp(sanitizedEmail, otp, "activation");
-        otpService.sendOtpEmail(sanitizedEmail, otp, "Account Activation");
+        otpService.issueOtp(sanitizedEmail, "activation");
     }
 
     /**
@@ -85,20 +92,13 @@ public class UserService {
         String sanitizedEmail = email.trim().toLowerCase();
         logger.info("Processing an activation OTP request");
 
-        User user = userRepository.findByEmail(sanitizedEmail)
-                .orElseThrow(() -> {
-                    logger.warn("Activation OTP rejected because the account does not exist");
-                    return new UserNotFoundException("User not found");
-                });
-
-        if (user.isActivated()) {
-            logger.warn("Activation OTP rejected because the account is already active");
-            throw new AccountNotActivatedException("Account already activated");
+        User user = userRepository.findByEmail(sanitizedEmail).orElse(null);
+        if (user == null || user.isActivated()) {
+            logger.info("Activation OTP request completed without a deliverable challenge");
+            return;
         }
 
-        String otp = otpService.generateOtp();
-        otpService.storeOtp(sanitizedEmail, otp, "activation");
-        otpService.sendOtpEmail(sanitizedEmail, otp, "Account Activation");
+        otpService.issueOtp(sanitizedEmail, "activation");
     }
 
     /**
@@ -137,15 +137,16 @@ public class UserService {
         String sanitizedEmail = email.trim().toLowerCase();
         logger.info("Processing a login request");
 
-        User user = userRepository.findByEmail(sanitizedEmail)
-                .orElseThrow(() -> {
-                    logger.warn("Login rejected");
-                    return new UserNotFoundException("User not found");
-                });
+        User user = userRepository.findByEmail(sanitizedEmail).orElse(null);
+        if (user == null) {
+            passwordEncoder.matches(password, dummyPasswordHash);
+            logger.warn("Login rejected");
+            throw new InvalidCredentialsException("Invalid email or password");
+        }
 
         if (!passwordEncoder.matches(password, user.getPasswd())) {
             logger.warn("Login rejected");
-            throw new InvalidCredentialsException("Invalid password");
+            throw new InvalidCredentialsException("Invalid email or password");
         }
 
         if (!user.isActivated()) {
@@ -158,7 +159,7 @@ public class UserService {
                     .map(Role::getRname)
                     .findFirst()
                     .orElseThrow(() -> new InvalidRoleException("No role assigned to user"));
-            String token = jwtUtil.generateToken(sanitizedEmail, Set.of(role));
+            String token = jwtUtil.generateToken(sanitizedEmail, Set.of(role), user.getAuthVersion());
             logger.info("Login completed successfully");
             return token;
         } catch (Exception e) {
@@ -190,21 +191,20 @@ public class UserService {
         String sanitizedEmail = email.trim().toLowerCase();
         logger.info("Processing a password-reset OTP request");
 
-        User user = userRepository.findByEmail(sanitizedEmail)
-                .orElseThrow(() -> {
-                    logger.warn("Password-reset OTP rejected");
-                    return new UserNotFoundException("User not found");
-                });
+        User user = userRepository.findByEmail(sanitizedEmail).orElse(null);
+        if (user == null) {
+            logger.info("Password-reset OTP request completed without a deliverable challenge");
+            return;
+        }
 
-        String otp = otpService.generateOtp();
-        otpService.storeOtp(sanitizedEmail, otp, "forgot-password");
-        otpService.sendOtpEmail(sanitizedEmail, otp, "Password Reset");
+        otpService.issueOtp(sanitizedEmail, "forgot-password");
     }
 
     /**
      * Reset password with OTP.
      */
     public void resetPassword(String email, String otp, String newPassword) {
+        PasswordPolicy.requireStrong(newPassword);
         String sanitizedEmail = email.trim().toLowerCase();
         logger.info("Processing a password reset");
 
@@ -215,7 +215,11 @@ public class UserService {
                 });
 
         otpService.validateOtp(sanitizedEmail, otp, "forgot-password");
+        if (passwordEncoder.matches(newPassword, user.getPasswd())) {
+            throw new IllegalArgumentException("Mật khẩu mới phải khác mật khẩu hiện tại");
+        }
         user.setPasswd(passwordEncoder.encode(newPassword));
+        user.setAuthVersion(user.getAuthVersion() + 1);
         userRepository.save(user);
         logger.info("Password reset completed successfully");
     }
@@ -265,6 +269,7 @@ public class UserService {
      * Validates current password before updating to new password.
      */
     public void changePassword(String email, String currentPassword, String newPassword) {
+        PasswordPolicy.requireStrong(newPassword);
         String sanitizedEmail = email.trim().toLowerCase();
         logger.info("Processing an authenticated password change");
 
@@ -280,8 +285,13 @@ public class UserService {
             throw new InvalidCredentialsException("Current password is incorrect");
         }
 
+        if (passwordEncoder.matches(newPassword, user.getPasswd())) {
+            throw new IllegalArgumentException("Mật khẩu mới phải khác mật khẩu hiện tại");
+        }
+
         // Update to new password
         user.setPasswd(passwordEncoder.encode(newPassword));
+        user.setAuthVersion(user.getAuthVersion() + 1);
         userRepository.save(user);
         logger.info("Password changed successfully");
     }

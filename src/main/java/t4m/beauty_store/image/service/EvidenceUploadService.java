@@ -9,6 +9,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 import t4m.beauty_store.image.entity.EvidenceKind;
+import t4m.beauty_store.config.StoreTime;
 import t4m.beauty_store.image.entity.PendingEvidenceUpload;
 import t4m.beauty_store.image.repository.PendingEvidenceUploadRepository;
 import t4m.beauty_store.order.entity.OrderItem;
@@ -20,7 +21,6 @@ import t4m.beauty_store.review.repository.ReviewRepository;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +41,7 @@ public class EvidenceUploadService {
     private final OrderItemRepository orderItemRepository;
     private final CloudinaryService cloudinaryService;
     private final ReviewRepository reviewRepository;
+    private final StoreTime storeTime;
 
     @Value("${uploads.evidence.pending-ttl:PT24H}")
     private Duration pendingTtl = Duration.ofHours(24);
@@ -63,7 +64,7 @@ public class EvidenceUploadService {
             throw new IllegalArgumentException("Sản phẩm trong đơn hàng này đã được đánh giá");
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        var now = storeTime.currentDateTime();
         if (uploadRepository.countActiveForScope(kind, orderItemId, now) >= MAX_IMAGES_PER_SCOPE) {
             throw new IllegalArgumentException("Mỗi sản phẩm có tối đa 5 ảnh");
         }
@@ -101,7 +102,7 @@ public class EvidenceUploadService {
             kind, orderItemId, urls);
         Map<String, PendingEvidenceUpload> byUrl = uploads.stream()
             .collect(Collectors.toMap(PendingEvidenceUpload::getUrl, Function.identity()));
-        LocalDateTime now = LocalDateTime.now();
+        var now = storeTime.currentDateTime();
         for (String url : urls) {
             PendingEvidenceUpload upload = byUrl.get(url);
             if (upload == null || upload.getClaimedAt() != null || !upload.getExpiresAt().isAfter(now)) {
@@ -120,7 +121,7 @@ public class EvidenceUploadService {
     @Transactional
     public void cleanupExpiredUploads() {
         List<PendingEvidenceUpload> expired = uploadRepository
-            .findTop100ByClaimedAtIsNullAndExpiresAtBeforeOrderByExpiresAtAsc(LocalDateTime.now());
+            .findTop100ByClaimedAtIsNullAndExpiresAtBeforeOrderByExpiresAtAsc(storeTime.currentDateTime());
         for (PendingEvidenceUpload upload : expired) {
             if (cloudinaryService.deleteImage(upload.getCloudinaryPublicId())) {
                 uploadRepository.delete(upload);

@@ -31,7 +31,7 @@ public class ShipperService {
      */
     public List<Order> getAvailableOrders() {
         logger.info("Getting available orders for shippers (PROCESSING status)");
-        return orderRepository.findByStatus(OrderStatus.PROCESSING, null).getContent();
+        return orderRepository.findByStatusOrderByCreatedAtDesc(OrderStatus.PROCESSING);
     }
 
     /**

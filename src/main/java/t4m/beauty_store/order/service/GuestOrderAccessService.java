@@ -5,7 +5,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import t4m.beauty_store.auth.exception.OtpRateLimitException;
-import t4m.beauty_store.auth.service.EmailService;
+import t4m.beauty_store.config.StoreTime;
 import t4m.beauty_store.order.dto.OrderResponse;
 import t4m.beauty_store.order.entity.GuestOrderAccess;
 import t4m.beauty_store.order.entity.Order;
@@ -17,7 +17,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
@@ -31,9 +30,10 @@ public class GuestOrderAccessService {
     private final OrderRepository orderRepository;
     private final GuestOrderAccessRepository accessRepository;
     private final PasswordEncoder passwordEncoder;
-    private final EmailService emailService;
+    private final GuestOrderOtpDeliveryService otpDeliveryService;
     private final GuestOrderOtpVerificationService otpVerificationService;
     private final GuestOrderOtpRateLimiter otpRateLimiter;
+    private final StoreTime storeTime;
     private final SecureRandom secureRandom = new SecureRandom();
 
     @Transactional
@@ -57,7 +57,7 @@ public class GuestOrderAccessService {
             .orElse(null);
         if (order == null) return;
 
-        LocalDateTime now = LocalDateTime.now();
+        var now = storeTime.currentDateTime();
         boolean coolingDown = accessRepository
             .findTopByOrderIdAndEmailIgnoreCaseOrderByCreatedAtDesc(order.getId(), normalizedEmail)
             .map(GuestOrderAccess::getResendAvailableAt)
@@ -73,9 +73,9 @@ public class GuestOrderAccessService {
             .expiresAt(now.plus(OTP_LIFETIME))
             .resendAvailableAt(now.plus(RESEND_DELAY))
             .build();
-        accessRepository.save(access);
-        emailService.sendGuestOrderOtp(
-            normalizedEmail, order.getCustomerName(), order.getOrderNumber(), otp);
+        GuestOrderAccess saved = accessRepository.saveAndFlush(access);
+        otpDeliveryService.schedule(saved.getId(), normalizedEmail,
+            order.getCustomerName(), order.getOrderNumber(), otp);
     }
 
     public String verifyOtp(String orderNumber, String email, String otp) {
@@ -112,7 +112,7 @@ public class GuestOrderAccessService {
         if (rawToken == null || !TOKEN_PATTERN.matcher(rawToken).matches()) {
             throw new IllegalArgumentException("Mã truy cập đơn hàng không hợp lệ hoặc đã hết hạn");
         }
-        LocalDateTime now = LocalDateTime.now();
+        var now = storeTime.currentDateTime();
         return accessRepository
             .findTopByOrderOrderNumberAndAccessTokenHashOrderByCreatedAtDesc(
                 orderNumber, sha256(rawToken))

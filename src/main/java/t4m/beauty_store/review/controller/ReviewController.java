@@ -13,6 +13,7 @@ import t4m.beauty_store.auth.repository.UserRepository;
 import t4m.beauty_store.review.dto.ReviewRequest;
 import t4m.beauty_store.review.dto.ReviewResponse;
 import t4m.beauty_store.review.service.ReviewService;
+import t4m.beauty_store.config.PageResponse;
 
 @RestController
 @RequestMapping("/api/reviews")
@@ -22,12 +23,12 @@ public class ReviewController {
     private final UserRepository userRepository;
 
     @GetMapping("/product/{productId}")
-    public ResponseEntity<Page<ReviewResponse>> list(
+    public ResponseEntity<PageResponse<ReviewResponse>> list(
             @PathVariable Long productId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        return ResponseEntity.ok(reviewService.publicReviews(productId,
-            PageRequest.of(Math.max(0, page), Math.max(1, Math.min(size, 50)))));
+        return ResponseEntity.ok(PageResponse.from(reviewService.publicReviews(productId,
+            PageRequest.of(Math.max(0, page), Math.max(1, Math.min(size, 50))))));
     }
 
     @PostMapping

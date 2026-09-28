@@ -108,11 +108,6 @@ public class SecurityConfig {
                                 "/api/payment/vnpay/return",
                                 "/api/payment/vnpay/ipn")
                         .permitAll()
-                        .requestMatchers(HttpMethod.POST,
-                                "/api/payment/vnpay/create-url/*",
-                                "/api/payment/vnpay/create-payment-link")
-                        .permitAll()
-
                         // Guest commerce endpoints use an opaque, HttpOnly guest cookie/token.
                         .requestMatchers("/api/cart/**", "/api/guest-orders/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/orders/checkout", "/api/vouchers/validate").permitAll()

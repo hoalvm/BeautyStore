@@ -11,7 +11,8 @@ import t4m.beauty_store.product.util.Slugifier;
 
 import java.math.BigDecimal;
 import java.util.*;
-import java.util.function.Predicate;
+import java.util.function.IntPredicate;
+import t4m.beauty_store.config.StoreTime;
 
 @Service
 @RequiredArgsConstructor
@@ -96,11 +97,7 @@ public class ProductService {
     public Page<Product> searchProducts(String keyword, Pageable pageable, boolean includeInactive) {
         if (!includeInactive) return searchProducts(keyword, pageable);
         String needle = normalizeForSearch(keyword);
-        List<Product> matches = productRepository.findAll().stream()
-            .filter(product -> matchesKeyword(product, needle))
-            .sorted(Comparator.comparing(Product::getId, Comparator.nullsLast(Comparator.reverseOrder())))
-            .toList();
-        return page(matches, pageable);
+        return productRepository.findAdminSearch(needle == null ? "" : needle, pageable);
     }
 
     /** Compatibility overload retained until legacy clients move to beauty facets. */
@@ -263,44 +260,48 @@ public class ProductService {
     }
 
     public ProductStockStats getStockStats() {
-        List<Product> products = productRepository.findAllByActiveTrue();
-        long total = products.size();
-        long inStock = products.stream().filter(product -> availableStock(product) > 0).count();
+        List<ProductStockProjection> stock = productRepository.findActiveProductStock(StoreTime.today());
+        long total = stock.size();
+        long inStock = stock.stream().filter(row -> stock(row) > 0).count();
         long outOfStock = total - inStock;
-        long lowStock = products.stream().filter(product -> {
-            int stock = availableStock(product);
-            int threshold = product.getVariants().stream()
-                .filter(variant -> Boolean.TRUE.equals(variant.getActive()))
-                .map(ProductVariant::getLowStockThreshold).filter(Objects::nonNull)
-                .min(Integer::compareTo).orElse(10);
-            return stock > 0 && stock <= threshold;
-        }).count();
-        long totalQuantity = products.stream().mapToLong(this::availableStock).sum();
+        long lowStock = stock.stream().filter(row -> stock(row) > 0
+            && stock(row) <= Optional.ofNullable(row.getLowStockThreshold()).orElse(10)).count();
+        long totalQuantity = stock.stream().mapToLong(ProductService::stock).sum();
         return ProductStockStats.builder().totalProducts(total).inStockProducts(inStock)
             .outOfStockProducts(outOfStock).lowStockProducts(lowStock)
             .totalStockQuantity(totalQuantity).build();
     }
 
     public Page<Product> getOutOfStockProducts(Pageable pageable) {
-        return stockPage(product -> availableStock(product) == 0, pageable);
+        return stockPage(value -> value == 0, pageable);
     }
 
     public Page<Product> getLowStockProducts(int threshold, Pageable pageable) {
         if (threshold < 0) throw new IllegalArgumentException("Threshold must be at least 0");
-        return stockPage(product -> availableStock(product) > 0 && availableStock(product) <= threshold, pageable);
+        return stockPage(value -> value > 0 && value <= threshold, pageable);
     }
 
     public Page<Product> getInStockProducts(int threshold, Pageable pageable) {
         if (threshold < 0) throw new IllegalArgumentException("Threshold must be at least 0");
-        return stockPage(product -> availableStock(product) > threshold, pageable);
+        return stockPage(value -> value > threshold, pageable);
     }
 
     public Product saveProduct(Product product) {
         return productRepository.save(product);
     }
 
-    private Page<Product> stockPage(Predicate<Product> predicate, Pageable pageable) {
-        return page(productRepository.findAllByActiveTrue().stream().filter(predicate).toList(), pageable);
+    private Page<Product> stockPage(IntPredicate predicate, Pageable pageable) {
+        List<Long> ids = productRepository.findActiveProductStock(StoreTime.today()).stream()
+            .filter(row -> predicate.test(stock(row))).map(ProductStockProjection::getProductId).toList();
+        long offset = pageable.getOffset();
+        if (offset >= ids.size()) return new PageImpl<>(List.of(), pageable, ids.size());
+        int start = Math.toIntExact(offset);
+        int end = (int) Math.min(offset + pageable.getPageSize(), ids.size());
+        return hydrate(new PageImpl<>(ids.subList(start, end), pageable, ids.size()));
+    }
+
+    private static int stock(ProductStockProjection row) {
+        return Math.toIntExact(Optional.ofNullable(row.getAvailableStock()).orElse(0L));
     }
 
     private ProductVariantRequest defaultVariantRequest(ProductCreateRequest request) {

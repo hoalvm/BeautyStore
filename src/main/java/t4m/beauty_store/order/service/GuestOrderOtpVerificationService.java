@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import t4m.beauty_store.order.entity.GuestOrderAccess;
+import t4m.beauty_store.config.StoreTime;
 import t4m.beauty_store.order.repository.GuestOrderAccessRepository;
 
 import java.nio.charset.StandardCharsets;
@@ -13,7 +14,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.Base64;
 
 /**
@@ -30,6 +30,7 @@ public class GuestOrderOtpVerificationService {
 
     private final GuestOrderAccessRepository accessRepository;
     private final PasswordEncoder passwordEncoder;
+    private final StoreTime storeTime;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public VerificationResult verifyLatest(Long orderId, String email, String suppliedOtp) {
@@ -39,7 +40,7 @@ public class GuestOrderOtpVerificationService {
             return VerificationResult.invalid();
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        var now = storeTime.currentDateTime();
         if (access.getVerifiedAt() != null || !access.getExpiresAt().isAfter(now)) {
             return VerificationResult.invalid();
         }

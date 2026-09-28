@@ -267,26 +267,24 @@ public class OrderService {
         return orderRepository.save(order);
     }
 
-    public BigDecimal getTotalRevenue() { return revenueSince(null); }
+    public BigDecimal getTotalRevenue() { return zeroIfNull(orderRepository.sumDeliveredRevenue()); }
     public BigDecimal getMonthlyRevenue() {
         LocalDateTime now = StoreTime.now();
-        return revenueSince(now.withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0));
+        LocalDateTime start = now.withDayOfMonth(1).toLocalDate().atStartOfDay();
+        return zeroIfNull(orderRepository.sumDeliveredRevenueBetween(start, start.plusMonths(1)));
     }
     public BigDecimal getTodayRevenue() {
-        LocalDateTime now = StoreTime.now();
-        return revenueSince(now.withHour(0).withMinute(0).withSecond(0));
+        LocalDateTime start = StoreTime.today().atStartOfDay();
+        return zeroIfNull(orderRepository.sumDeliveredRevenueBetween(start, start.plusDays(1)));
     }
     public BigDecimal getAverageOrderValue() {
-        List<Order> delivered = orderRepository.findAll().stream()
-            .filter(order -> order.getStatus() == OrderStatus.DELIVERED).toList();
-        if (delivered.isEmpty()) return BigDecimal.ZERO;
-        return delivered.stream().map(Order::getTotalAmount).reduce(BigDecimal.ZERO, BigDecimal::add)
-            .divide(BigDecimal.valueOf(delivered.size()), 0, java.math.RoundingMode.HALF_UP);
+        long delivered = orderRepository.countByStatus(OrderStatus.DELIVERED);
+        if (delivered == 0) return BigDecimal.ZERO;
+        return getTotalRevenue().divide(BigDecimal.valueOf(delivered), 0, java.math.RoundingMode.HALF_UP);
     }
     public long getTodayOrderCount() {
-        LocalDateTime start = StoreTime.now().withHour(0).withMinute(0).withSecond(0);
-        return orderRepository.findAll().stream().filter(order -> order.getCreatedAt() != null
-            && order.getCreatedAt().isAfter(start)).count();
+        LocalDateTime start = StoreTime.today().atStartOfDay();
+        return orderRepository.countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(start, start.plusDays(1));
     }
 
     @Transactional
@@ -606,11 +604,8 @@ public class OrderService {
         voucherService.restoreVoucherUsageForOrder(order);
     }
 
-    private BigDecimal revenueSince(LocalDateTime since) {
-        return orderRepository.findAll().stream()
-            .filter(order -> order.getStatus() == OrderStatus.DELIVERED)
-            .filter(order -> since == null || order.getCreatedAt() != null && order.getCreatedAt().isAfter(since))
-            .map(Order::getTotalAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+    private static BigDecimal zeroIfNull(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 
     private static String normalizePaymentMethod(String value) {

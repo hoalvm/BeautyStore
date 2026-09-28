@@ -7,8 +7,11 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import t4m.beauty_store.order.entity.GuestOrderAccess;
 import t4m.beauty_store.order.repository.GuestOrderAccessRepository;
+import t4m.beauty_store.config.StoreTime;
 
 import java.lang.reflect.Method;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -23,12 +26,14 @@ class GuestOrderOtpVerificationServiceTests {
     private GuestOrderAccessRepository accessRepository;
     private PasswordEncoder passwordEncoder;
     private GuestOrderOtpVerificationService service;
+    private StoreTime storeTime;
 
     @BeforeEach
     void setUp() {
         accessRepository = mock(GuestOrderAccessRepository.class);
         passwordEncoder = mock(PasswordEncoder.class);
-        service = new GuestOrderOtpVerificationService(accessRepository, passwordEncoder);
+        storeTime = fixedTime();
+        service = new GuestOrderOtpVerificationService(accessRepository, passwordEncoder, storeTime);
     }
 
     @Test
@@ -81,7 +86,7 @@ class GuestOrderOtpVerificationServiceTests {
     @Test
     void expiredChallengeRejectsEvenTheCorrectOtp() {
         GuestOrderAccess access = activeChallenge(0);
-        access.setExpiresAt(LocalDateTime.now().minusSeconds(1));
+        access.setExpiresAt(storeTime.currentDateTime().minusSeconds(1));
         when(accessRepository.findLatestForUpdate(7L, "guest@example.com"))
             .thenReturn(Optional.of(access));
 
@@ -100,17 +105,13 @@ class GuestOrderOtpVerificationServiceTests {
         when(accessRepository.findLatestForUpdate(7L, "guest@example.com"))
             .thenReturn(Optional.of(access));
         when(passwordEncoder.matches("123456", "otp-hash")).thenReturn(true);
-        LocalDateTime before = LocalDateTime.now();
-
         GuestOrderOtpVerificationService.VerificationResult result =
             service.verifyLatest(7L, "guest@example.com", "123456");
-
-        LocalDateTime after = LocalDateTime.now();
         assertThat(result.status())
             .isEqualTo(GuestOrderOtpVerificationService.VerificationStatus.VERIFIED);
         assertThat(result.accessToken()).matches("[A-Za-z0-9_-]{43}");
         assertThat(access.getAccessTokenHash()).matches("[a-f0-9]{64}");
-        assertThat(access.getVerifiedAt()).isBetween(before, after);
+        assertThat(access.getVerifiedAt()).isEqualTo(storeTime.currentDateTime());
         assertThat(access.getExpiresAt()).isEqualTo(access.getVerifiedAt());
         assertThat(access.getAccessTokenExpiresAt())
             .isEqualTo(access.getVerifiedAt().plusMinutes(30));
@@ -128,14 +129,18 @@ class GuestOrderOtpVerificationServiceTests {
         assertThat(annotation.propagation()).isEqualTo(Propagation.REQUIRES_NEW);
     }
 
-    private static GuestOrderAccess activeChallenge(int attempts) {
+    private GuestOrderAccess activeChallenge(int attempts) {
         return GuestOrderAccess.builder()
             .id(11L)
             .email("guest@example.com")
             .otpHash("otp-hash")
-            .expiresAt(LocalDateTime.now().plusMinutes(5))
-            .resendAvailableAt(LocalDateTime.now().plusSeconds(60))
+            .expiresAt(storeTime.currentDateTime().plusMinutes(5))
+            .resendAvailableAt(storeTime.currentDateTime().plusSeconds(60))
             .attempts(attempts)
             .build();
+    }
+
+    private static StoreTime fixedTime() {
+        return new StoreTime(Clock.fixed(Instant.parse("2026-06-15T03:00:00Z"), StoreTime.ZONE));
     }
 }

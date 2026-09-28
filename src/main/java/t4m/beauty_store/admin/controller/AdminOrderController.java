@@ -13,6 +13,7 @@ import t4m.beauty_store.order.dto.OrderResponse;
 import t4m.beauty_store.order.entity.Order;
 import t4m.beauty_store.order.entity.OrderStatus;
 import t4m.beauty_store.order.service.OrderService;
+import t4m.beauty_store.config.PageResponse;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -25,11 +26,13 @@ public class AdminOrderController {
     private final OrderService orderService;
 
     @GetMapping
-    public ResponseEntity<Page<OrderResponse>> getAllOrders(
+    public ResponseEntity<PageResponse<OrderResponse>> getAllOrders(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) OrderStatus status) {
-        
+        if (page < 0 || size < 1 || size > 100) {
+            throw new IllegalArgumentException("Phân trang không hợp lệ");
+        }
         Page<Order> orders;
         if (status != null) {
             orders = orderService.getOrdersByStatus(status, PageRequest.of(page, size, Sort.by("createdAt").descending()));
@@ -38,7 +41,7 @@ public class AdminOrderController {
         }
         
         Page<OrderResponse> response = orders.map(OrderResponse::fromEntity);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(PageResponse.from(response));
     }
 
     @GetMapping("/{id}")

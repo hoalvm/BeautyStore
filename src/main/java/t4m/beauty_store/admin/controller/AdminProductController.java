@@ -12,6 +12,7 @@ import t4m.beauty_store.admin.dto.*;
 import t4m.beauty_store.product.dto.ProductResponse;
 import t4m.beauty_store.product.entity.Product;
 import t4m.beauty_store.product.service.ProductService;
+import t4m.beauty_store.config.PageResponse;
 
 import java.util.Map;
 
@@ -23,16 +24,17 @@ public class AdminProductController {
     private final ProductService productService;
 
     @GetMapping
-    public ResponseEntity<Page<ProductResponse>> getAllProducts(
+    public ResponseEntity<PageResponse<ProductResponse>> getAllProducts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "false") boolean includeInactive) {
+        validatePage(page, size);
         Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
         Page<Product> products = search == null || search.isBlank()
             ? productService.getAllProducts(pageable, includeInactive)
             : productService.searchProducts(search, pageable, includeInactive);
-        return ResponseEntity.ok(products.map(ProductResponse::fromEntity));
+        return ResponseEntity.ok(PageResponse.from(products.map(ProductResponse::fromEntity)));
     }
 
     @GetMapping("/{id}")
@@ -79,28 +81,37 @@ public class AdminProductController {
     }
 
     @GetMapping("/out-of-stock")
-    public ResponseEntity<Page<ProductResponse>> getOutOfStock(
+    public ResponseEntity<PageResponse<ProductResponse>> getOutOfStock(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return ResponseEntity.ok(productService.getOutOfStockProducts(PageRequest.of(page, size))
-            .map(ProductResponse::fromEntity));
+        validatePage(page, size);
+        return ResponseEntity.ok(PageResponse.from(productService.getOutOfStockProducts(PageRequest.of(page, size))
+            .map(ProductResponse::fromEntity)));
     }
 
     @GetMapping("/low-stock")
-    public ResponseEntity<Page<ProductResponse>> getLowStock(
+    public ResponseEntity<PageResponse<ProductResponse>> getLowStock(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "10") int threshold) {
-        return ResponseEntity.ok(productService.getLowStockProducts(threshold, PageRequest.of(page, size))
-            .map(ProductResponse::fromEntity));
+        validatePage(page, size);
+        return ResponseEntity.ok(PageResponse.from(productService.getLowStockProducts(threshold, PageRequest.of(page, size))
+            .map(ProductResponse::fromEntity)));
     }
 
     @GetMapping("/in-stock")
-    public ResponseEntity<Page<ProductResponse>> getInStock(
+    public ResponseEntity<PageResponse<ProductResponse>> getInStock(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "0") int threshold) {
-        return ResponseEntity.ok(productService.getInStockProducts(threshold, PageRequest.of(page, size))
-            .map(ProductResponse::fromEntity));
+        validatePage(page, size);
+        return ResponseEntity.ok(PageResponse.from(productService.getInStockProducts(threshold, PageRequest.of(page, size))
+            .map(ProductResponse::fromEntity)));
+    }
+
+    private static void validatePage(int page, int size) {
+        if (page < 0 || size < 1 || size > 100) {
+            throw new IllegalArgumentException("Phân trang không hợp lệ");
+        }
     }
 }

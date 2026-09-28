@@ -3,6 +3,7 @@ package t4m.beauty_store.admin.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
+import t4m.beauty_store.auth.validation.StrongPassword;
 
 @Data
 public class AccountUpdateRequest {
@@ -17,6 +18,7 @@ public class AccountUpdateRequest {
 
     private String role; // Optional: change role
 
+    @StrongPassword
     private String password; // Optional: change password
     private String confirmPassword; // Optional: confirm new password
 }
