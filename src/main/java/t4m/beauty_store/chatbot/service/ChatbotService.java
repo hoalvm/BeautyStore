@@ -13,6 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 import t4m.beauty_store.chatbot.dto.ConversationState;
@@ -54,6 +55,8 @@ public class ChatbotService {
     private static final int MAX_CONVERSATIONS = 10_000;
     private static final int CONTEXT_PRODUCTS_PER_GROUP = 6;
     private static final int MAX_MESSAGE_LENGTH = 1_000;
+    private static final int GEMINI_CONNECT_TIMEOUT_MS = 5_000;
+    private static final int GEMINI_READ_TIMEOUT_MS = 20_000;
 
     private static final Pattern DIACRITICS = Pattern.compile("\\p{M}+");
     private static final Pattern PAYMENT_CARD_PATTERN =
@@ -69,7 +72,7 @@ public class ChatbotService {
     private final IntentRecognitionService intentRecognitionService;
     private final InteractionLoggingService interactionLoggingService;
     private final StoreProperties storeProperties;
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate = createRestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Map<String, Deque<Map<String, String>>> conversationHistory = new ConcurrentHashMap<>();
 
@@ -163,6 +166,13 @@ public class ChatbotService {
 
     public String generateConversationId() {
         return UUID.randomUUID().toString();
+    }
+
+    private static RestTemplate createRestTemplate() {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(GEMINI_CONNECT_TIMEOUT_MS);
+        requestFactory.setReadTimeout(GEMINI_READ_TIMEOUT_MS);
+        return new RestTemplate(requestFactory);
     }
 
     private CatalogSnapshot loadActiveCatalog() {
