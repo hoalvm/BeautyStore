@@ -4,17 +4,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.HttpStatus;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.server.ResponseStatusException;
 import t4m.beauty_store.order.service.OrderService;
 import t4m.beauty_store.payment.dto.VNPayPaymentResult;
 import t4m.beauty_store.payment.service.VNPayService;
@@ -119,52 +113,6 @@ public class VNPayController {
             log.error("Could not process VNPay IPN: {}", exception.getClass().getSimpleName());
             return ipnResponse("99", "Unknown error");
         }
-    }
-
-    /**
-     * A VNPay TxnRef is single-use. Reissuing a link for the same order allows
-     * a delayed IPN from the older browser session to race the newer payment.
-     * V1 therefore requires a fresh checkout after a failed/abandoned attempt.
-     */
-    @PostMapping("/create-url/{orderNumber}")
-    @ResponseBody
-    public ResponseEntity<?> createPaymentUrlForOrder(@PathVariable String orderNumber,
-                                                       Authentication authentication,
-                                                       @org.springframework.web.bind.annotation.RequestHeader(
-                                                           value = "X-Order-Token", required = false)
-                                                       String guestOrderToken,
-                                                       HttpServletRequest httpRequest) {
-        return createServerPricedPaymentUrl(
-            orderNumber, authentication, guestOrderToken, httpRequest);
-    }
-
-    /**
-     * Backward-compatible endpoint. Client-supplied amount/orderInfo are ignored;
-     * the server loads both the order status and total before creating the URL.
-     */
-    @PostMapping("/create-payment-link")
-    @ResponseBody
-    public ResponseEntity<?> createPaymentLink(@RequestBody Map<String, Object> requestData,
-                                                Authentication authentication,
-                                                @org.springframework.web.bind.annotation.RequestHeader(
-                                                    value = "X-Order-Token", required = false)
-                                                String guestOrderToken,
-                                                HttpServletRequest httpRequest) {
-        Object value = requestData.get("orderNumber");
-        if (!(value instanceof String orderNumber)) {
-            throw new IllegalArgumentException("Thiếu mã đơn hàng");
-        }
-        return createServerPricedPaymentUrl(
-            orderNumber, authentication, guestOrderToken, httpRequest);
-    }
-
-    private ResponseEntity<?> createServerPricedPaymentUrl(String orderNumber,
-                                                             Authentication authentication,
-                                                             String guestOrderToken,
-                                                             HttpServletRequest request) {
-        validateOrderNumber(orderNumber);
-        throw new ResponseStatusException(HttpStatus.CONFLICT,
-            "Liên kết VNPay không được cấp lại; vui lòng tạo checkout mới để bảo đảm an toàn thanh toán");
     }
 
     private Map<String, String> extractVnPayParameters(HttpServletRequest request) {
