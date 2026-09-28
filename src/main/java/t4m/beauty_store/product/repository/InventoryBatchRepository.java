@@ -19,6 +19,10 @@ public interface InventoryBatchRepository extends JpaRepository<InventoryBatch, 
     boolean existsByVariantIdAndBatchCodeIgnoreCase(Long variantId, String batchCode);
     boolean existsByVariantIdAndBatchCodeIgnoreCaseAndIdNot(Long variantId, String batchCode, Long id);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT b FROM InventoryBatch b WHERE b.id = :id")
+    Optional<InventoryBatch> findByIdForUpdate(@Param("id") Long id);
+
     @Query("SELECT COALESCE(SUM(b.quantityOnHand - b.quantityReserved), 0) " +
            "FROM InventoryBatch b WHERE b.variant.id = :variantId AND b.active = true " +
            "AND b.expiryDate >= :today AND b.quantityOnHand > b.quantityReserved")
