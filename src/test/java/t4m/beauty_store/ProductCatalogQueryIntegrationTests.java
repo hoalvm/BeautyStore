@@ -168,6 +168,17 @@ class ProductCatalogQueryIntegrationTests {
         }
     }
 
+    @Test
+    void stockDashboardUsesDatabaseProjection() {
+        var stats = productService.getStockStats();
+
+        assertThat(stats.getTotalProducts()).isGreaterThanOrEqualTo(40);
+        assertThat(stats.getTotalStockQuantity()).isPositive();
+        assertThat(stats.getInStockProducts() + stats.getOutOfStockProducts())
+            .isEqualTo(stats.getTotalProducts());
+        assertThat(productService.getOutOfStockProducts(PageRequest.of(0, 20))).isNotNull();
+    }
+
     private long queryCountForPage(Statistics statistics, int size) {
         entityManager.clear();
         statistics.clear();
