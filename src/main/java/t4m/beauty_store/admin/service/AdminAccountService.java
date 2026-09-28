@@ -2,11 +2,9 @@ package t4m.beauty_store.admin.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -36,121 +34,41 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class AdminAccountService {
     private static final Logger logger = LoggerFactory.getLogger(AdminAccountService.class);
 
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private RoleRepository roleRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private EmailService emailService;
-
-    @Autowired
-    private OtpService otpService;
-
-    @Autowired
-    private OrderRepository orderRepository;
-
-    @Autowired
-    private CartRepository cartRepository;
-
-    @Autowired
-    private FavoriteRepository favoriteRepository;
-
-    @Autowired
-    private RatingRepository ratingRepository;
-
-    @Autowired
-    private ReviewRepository reviewRepository;
-
-    @Autowired
-    private ReturnRequestRepository returnRequestRepository;
-
-    @Autowired
-    private VoucherUsageRepository voucherUsageRepository;
-
-    @Autowired
-    private StoreProperties storeProperties;
+    private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final EmailService emailService;
+    private final OtpService otpService;
+    private final OrderRepository orderRepository;
+    private final CartRepository cartRepository;
+    private final FavoriteRepository favoriteRepository;
+    private final RatingRepository ratingRepository;
+    private final ReviewRepository reviewRepository;
+    private final ReturnRequestRepository returnRequestRepository;
+    private final VoucherUsageRepository voucherUsageRepository;
+    private final StoreProperties storeProperties;
 
     /**
      * Get all accounts with pagination, search, and filtering
      */
     public Page<AccountDTO> getAccounts(String search, String roleFilter, String statusFilter,
                                          int page, int size, String sortBy, String sortDir) {
-        Sort sort = sortDir.equalsIgnoreCase("desc")
-            ? Sort.by(sortBy).descending()
-            : Sort.by(sortBy).ascending();
-
-        Pageable pageable = PageRequest.of(page, size, sort);
-
-        // Get all users first (in production, use custom repository with Specifications)
-        List<User> allUsers = userRepository.findAll();
-
-        // Apply filters manually
-        List<User> filteredUsers = allUsers.stream()
-            .filter(user -> {
-                // Search filter
-                if (!search.isEmpty()) {
-                    String searchLower = search.toLowerCase();
-                    boolean matchesSearch = user.getName().toLowerCase().contains(searchLower) ||
-                                          user.getEmail().toLowerCase().contains(searchLower) ||
-                                          (user.getPhone() != null && user.getPhone().contains(search));
-                    if (!matchesSearch) return false;
-                }
-
-                // Role filter
-                if (!roleFilter.isEmpty()) {
-                    boolean hasRole = user.getRoles().stream()
-                        .anyMatch(role -> role.getRname().equals(roleFilter));
-                    if (!hasRole) return false;
-                }
-
-                // Status filter (removed since we don't use ban/unban anymore)
-                // if (!statusFilter.isEmpty()) {
-                //     boolean statusMatch = statusFilter.equals("active") ? user.isActivated() : !user.isActivated();
-                //     if (!statusMatch) return false;
-                // }
-
-                return true;
-            })
-            .sorted((u1, u2) -> {
-                int comparison = 0;
-                switch (sortBy) {
-                    case "name":
-                        comparison = u1.getName().compareTo(u2.getName());
-                        break;
-                    case "email":
-                        comparison = u1.getEmail().compareTo(u2.getEmail());
-                        break;
-                    case "created":
-                        comparison = u1.getCreated().compareTo(u2.getCreated());
-                        break;
-                    default:
-                        comparison = u1.getCreated().compareTo(u2.getCreated());
-                }
-                return sortDir.equalsIgnoreCase("desc") ? -comparison : comparison;
-            })
-            .collect(Collectors.toList());
-
-        // Manual pagination
-        int totalItems = filteredUsers.size();
-        int startIndex = page * size;
-        int endIndex = Math.min(startIndex + size, totalItems);
-        List<User> pageUsers = startIndex < totalItems ?
-            filteredUsers.subList(startIndex, endIndex) : new ArrayList<>();
-
-        // Convert to DTOs
-        List<AccountDTO> pageDTOs = pageUsers.stream()
-            .map(this::convertToDTO)
-            .collect(Collectors.toList());
-
-        return new PageImpl<>(pageDTOs, pageable, totalItems);
+        if (page < 0 || size < 1 || size > 100) {
+            throw new IllegalArgumentException("Phân trang không hợp lệ");
+        }
+        String property = switch (sortBy == null ? "" : sortBy) {
+            case "name" -> "name";
+            case "email" -> "email";
+            default -> "created";
+        };
+        Sort sort = "asc".equalsIgnoreCase(sortDir)
+            ? Sort.by(property).ascending() : Sort.by(property).descending();
+        return userRepository.findAdminPage(clean(search), clean(roleFilter), normalizeStatus(statusFilter),
+            PageRequest.of(page, size, sort)).map(this::convertToDTO);
     }
 
     /**
@@ -453,6 +371,15 @@ public class AdminAccountService {
         return email != null && user.getEmail() != null && user.getEmail().equalsIgnoreCase(email);
     }
 
+    private static String clean(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private static String normalizeStatus(String value) {
+        String status = clean(value).toLowerCase(Locale.ROOT);
+        return "active".equals(status) || "inactive".equals(status) ? status : "";
+    }
+
     private String appUrl(String path) {
         String baseUrl = storeProperties.getBaseUrl().trim();
         while (baseUrl.endsWith("/")) {
@@ -465,16 +392,9 @@ public class AdminAccountService {
      * Search accounts
      */
     public List<AccountDTO> searchAccounts(String keyword) {
-        List<User> users = userRepository.findAll();
-        
-        return users.stream()
-            .filter(user -> 
-                user.getName().toLowerCase().contains(keyword.toLowerCase()) ||
-                user.getEmail().toLowerCase().contains(keyword.toLowerCase()) ||
-                (user.getPhone() != null && user.getPhone().contains(keyword))
-            )
-            .map(this::convertToDTO)
-            .collect(Collectors.toList());
+        return userRepository.findAdminPage(clean(keyword), "", "",
+            PageRequest.of(0, 100, Sort.by("created").descending()))
+            .map(this::convertToDTO).getContent();
     }
 
     /**

@@ -7,6 +7,9 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import t4m.beauty_store.admin.dto.AccountUpdateRequest;
 import t4m.beauty_store.admin.dto.BulkActionRequest;
 import t4m.beauty_store.auth.entity.Role;
@@ -29,6 +32,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -67,20 +71,10 @@ class AdminAccountServiceTests {
 
     @BeforeEach
     void setUp() {
-        service = new AdminAccountService();
-        setField("userRepository", userRepository);
-        setField("roleRepository", roleRepository);
-        setField("passwordEncoder", passwordEncoder);
-        setField("emailService", emailService);
-        setField("otpService", otpService);
-        setField("orderRepository", orderRepository);
-        setField("cartRepository", cartRepository);
-        setField("favoriteRepository", favoriteRepository);
-        setField("ratingRepository", ratingRepository);
-        setField("reviewRepository", reviewRepository);
-        setField("returnRequestRepository", returnRequestRepository);
-        setField("voucherUsageRepository", voucherUsageRepository);
-        setField("storeProperties", new StoreProperties());
+        service = new AdminAccountService(userRepository, roleRepository, passwordEncoder,
+            emailService, otpService, orderRepository, cartRepository, favoriteRepository,
+            ratingRepository, reviewRepository, returnRequestRepository, voucherUsageRepository,
+            new StoreProperties());
     }
 
     @Test
@@ -91,6 +85,21 @@ class AdminAccountServiceTests {
 
         verify(otpService).issueOtp("customer@example.com", "forgot-password");
         verifyNoInteractions(emailService);
+    }
+
+    @Test
+    void accountListingUsesRepositoryPaginationAndStatusFilter() {
+        User customer = user(7L, "customer@example.com", true, "ROLE_USER");
+        var pageable = PageRequest.of(1, 20, Sort.by("email").ascending());
+        when(userRepository.findAdminPage("customer", "ROLE_USER", "active", pageable))
+            .thenReturn(new PageImpl<>(List.of(customer), pageable, 21));
+
+        var result = service.getAccounts(" customer ", "ROLE_USER", "ACTIVE",
+            1, 20, "email", "asc");
+
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getTotalElements()).isEqualTo(21);
+        verify(userRepository, never()).findAll();
     }
 
     @Test
@@ -314,13 +323,4 @@ class AdminAccountServiceTests {
         return user;
     }
 
-    private void setField(String name, Object value) {
-        try {
-            var field = AdminAccountService.class.getDeclaredField(name);
-            field.setAccessible(true);
-            field.set(service, value);
-        } catch (ReflectiveOperationException exception) {
-            throw new AssertionError("Cannot inject test dependency " + name, exception);
-        }
-    }
 }
