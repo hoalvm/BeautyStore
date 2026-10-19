@@ -21,6 +21,16 @@ function safeDeliveryId(value) {
     return Number.isSafeInteger(id) && id > 0 ? id : 0;
 }
 
+const pendingDeliveryUpdates = new Set();
+
+function setDeliveryBusy(orderId, busy) {
+    if (busy) pendingDeliveryUpdates.add(orderId);
+    else pendingDeliveryUpdates.delete(orderId);
+    document.querySelectorAll(`[data-order-id="${safeDeliveryId(orderId)}"]`).forEach(button => {
+        if (['accept', 'complete', 'fail'].includes(button.dataset.orderAction)) button.disabled = busy;
+    });
+}
+
 function wireOrderTableActions(container) {
     container.querySelectorAll('[data-order-action]').forEach(button => {
         button.addEventListener('click', () => {
@@ -612,6 +622,7 @@ function displayHistory(orders) {
 
 // Accept order (PROCESSING -> SHIPPING)
 async function acceptOrder(orderId) {
+    if (!safeDeliveryId(orderId) || pendingDeliveryUpdates.has(orderId)) return;
     if (!confirm('Bạn có chắc muốn nhận đơn hàng này?')) {
         return;
     }
@@ -619,6 +630,7 @@ async function acceptOrder(orderId) {
     const token = localStorage.getItem('authToken') || localStorage.getItem('token');
     if (!token) return;
 
+    setDeliveryBusy(orderId, true);
     try {
         const response = await fetch(`/api/shipper/orders/${orderId}/accept`, {
             method: 'PUT',
@@ -640,11 +652,14 @@ async function acceptOrder(orderId) {
     } catch (error) {
         console.error('Error accepting order:', error);
         showToast('Lỗi kết nối', 'danger');
+    } finally {
+        setDeliveryBusy(orderId, false);
     }
 }
 
 // Complete order (SHIPPING -> DELIVERED)
 async function completeOrder(orderId) {
+    if (!safeDeliveryId(orderId) || pendingDeliveryUpdates.has(orderId)) return;
     if (!confirm('Xác nhận đã giao hàng thành công?')) {
         return;
     }
@@ -652,6 +667,7 @@ async function completeOrder(orderId) {
     const token = localStorage.getItem('authToken') || localStorage.getItem('token');
     if (!token) return;
 
+    setDeliveryBusy(orderId, true);
     try {
         const response = await fetch(`/api/shipper/orders/${orderId}/complete`, {
             method: 'PUT',
@@ -672,12 +688,15 @@ async function completeOrder(orderId) {
     } catch (error) {
         console.error('Error completing order:', error);
         showToast('Lỗi kết nối', 'danger');
+    } finally {
+        setDeliveryBusy(orderId, false);
     }
 }
 
 // Report delivery failure
 async function failOrder(orderId) {
-    const reason = prompt('Vui lòng nhập lý do giao hàng thất bại:', 'Không thể liên hệ khách hàng');
+    if (!safeDeliveryId(orderId) || pendingDeliveryUpdates.has(orderId)) return;
+    const reason = prompt('Vui lòng nhập lý do giao hàng thất bại:', 'Không thể liên hệ khách hàng')?.trim();
     
     if (!reason) {
         return; // User cancelled
@@ -686,6 +705,7 @@ async function failOrder(orderId) {
     const token = localStorage.getItem('authToken') || localStorage.getItem('token');
     if (!token) return;
 
+    setDeliveryBusy(orderId, true);
     try {
         const response = await fetch(`/api/shipper/orders/${orderId}/fail`, {
             method: 'PUT',
@@ -708,6 +728,8 @@ async function failOrder(orderId) {
     } catch (error) {
         console.error('Error reporting failure:', error);
         showToast('Lỗi kết nối', 'danger');
+    } finally {
+        setDeliveryBusy(orderId, false);
     }
 }
 
@@ -1001,10 +1023,13 @@ function showTab(tabName) {
     if (tabId) {
         document.getElementById(tabId).style.display = 'block';
         
-        // Set active nav link
-        if (event && event.target) {
-            event.target.classList.add('active');
-        }
+        // Select the navigation link, never rely on the non-standard window.event.
+        document.querySelectorAll('.sidebar [data-shipper-tab]').forEach(link => {
+            const selected = link.dataset.shipperTab === tabName;
+            link.classList.toggle('active', selected);
+            if (selected) link.setAttribute('aria-current', 'page');
+            else link.removeAttribute('aria-current');
+        });
         
         // Load data for the tab
         switch(tabName) {
@@ -1026,16 +1051,10 @@ function showTab(tabName) {
 
 // Tab navigation with filter (for history tab)
 function showTabWithFilter(tabName, filterStatus) {
-    // First show the tab
-    showTab(tabName);
-    
-    // Then apply the filter if it's history tab
     if (tabName === 'history' && filterStatus) {
-        // Wait a bit for the data to load
-        setTimeout(() => {
-            filterHistory(filterStatus);
-        }, 500);
+        currentFilter = filterStatus;
     }
+    showTab(tabName);
 }
 
 // Utility functions
