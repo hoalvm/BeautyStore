@@ -11,32 +11,31 @@
             <div class="col-md-6 col-lg-5">
                 <div class="auth-card">
                     <div class="auth-header">
-                        <h2 class="mb-0"><i class="fas fa-shield-alt me-2"></i>Xác thực tài khoản</h2>
-                        <p class="mb-0 mt-2 opacity-75">Nhập mã OTP đã được gửi tới email của bạn.</p>
+                        <h1 class="h2 mb-0"><i class="fas fa-shield-alt me-2" aria-hidden="true"></i>Xác thực tài khoản</h1>
+                        <p class="mb-0 mt-2 opacity-75">Nhập mã OTP từ email, hoặc gửi lại mã nếu cần. Mã có hiệu lực trong 5 phút; mỗi lần gửi cách nhau ít nhất 60 giây.</p>
                     </div>
                     <div class="auth-body">
                         <form id="verifyForm">
                             <div class="mb-3">
                                 <label for="verifyEmail" class="form-label">Email tài khoản</label>
                                 <input type="email" class="form-control form-control-lg" id="verifyEmail" name="email"
-                                       required readonly
-                                       style="background-color: #eee; cursor: not-allowed;">
+                                       required autocomplete="username" inputmode="email" maxlength="255">
                             </div>
                             <div class="mb-4">
                                 <label for="verifyOtp" class="form-label">Mã OTP</label>
                                 <input type="text" class="form-control form-control-lg text-center" id="verifyOtp"
-                                       name="otp" required
+                                       name="otp" required inputmode="numeric" pattern="[0-9]{6}" autocomplete="one-time-code"
                                        placeholder="Nhập 6 chữ số" maxlength="6">
                             </div>
                             <button type="submit" class="btn btn-success btn-lg w-100 mb-3">
                                 <i class="fas fa-user-check me-2"></i>Kích hoạt tài khoản
                             </button>
                             <button id="resendOtpButton" type="button" class="btn btn-outline-secondary w-100">
-                                <i class="fas fa-satellite me-2"></i>Gửi lại tín hiệu
+                                <i class="fas fa-envelope me-2" aria-hidden="true"></i>Gửi lại mã OTP
                             </button>
                         </form>
 
-                        <div id="verifyMessage" class="mt-3 d-none"></div>
+                        <div id="verifyMessage" class="mt-3 d-none" role="status" aria-live="polite" aria-atomic="true"></div>
 
                         <div class="text-center mt-4">
                             <a th:href="@{/}" class="text-decoration-none">
