@@ -2,6 +2,8 @@ let currentPage = 0;
 let currentStatus = '';
 let currentSearch = '';
 const pageSize = 20;
+let orderListRequest = 0;
+const pendingOrderUpdates = new Set();
 
 function escapeOrderText(value) {
     return String(value ?? '')
@@ -102,6 +104,7 @@ async function loadOrderStats() {
 }
 
 async function loadOrders() {
+    const request = ++orderListRequest;
     const token = localStorage.getItem('authToken') || localStorage.getItem('token');
     const userEmail = localStorage.getItem('authEmail') || localStorage.getItem('userEmail');
     
@@ -122,10 +125,6 @@ async function loadOrders() {
             url += `&status=${currentStatus}`;
         }
         
-        if (currentStatus) {
-            url += `&status=${currentStatus}`;
-        }
-
         const response = await fetch(url, {
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -137,10 +136,12 @@ async function loadOrders() {
         }
 
         const data = await response.json();
+        if (request !== orderListRequest) return;
         displayOrders(data);
         updatePagination(data);
 
     } catch (error) {
+        if (request !== orderListRequest) return;
         console.error('Error loading orders:', error);
         tbody.innerHTML = `
             <tr>
@@ -253,6 +254,8 @@ function getStatusBadge(status) {
     const badges = {
         'PENDING_PAYMENT': '<span class="badge bg-warning"><i class="fas fa-credit-card me-1"></i>Chờ thanh toán</span>',
         'PENDING': '<span class="badge bg-warning"><i class="fas fa-clock me-1"></i>Chờ xử lý</span>',
+        'CONFIRMED': '<span class="badge bg-info">Đã xác nhận</span>',
+        'REFUNDED': '<span class="badge bg-secondary">Đã hoàn tiền</span>',
         'PROCESSING': '<span class="badge bg-info"><i class="fas fa-cogs me-1"></i>Đang xử lý</span>',
         'SHIPPING': '<span class="badge bg-primary"><i class="fas fa-shipping-fast me-1"></i>Đang giao</span>',
         'DELIVERED': '<span class="badge bg-success badge-delivered"><i class="fas fa-check-circle me-1"></i>Giao thành công</span>',
@@ -275,23 +278,25 @@ function getStatusClass(status) {
     return classes[status] || '';
 }
 
+function allowedOrderTransitions(order) {
+    const options = {
+        PENDING_PAYMENT: ['CANCELLED'], PENDING: ['CONFIRMED', 'PROCESSING', 'CANCELLED'],
+        CONFIRMED: ['PROCESSING', 'CANCELLED'], PROCESSING: ['CANCELLED'], FAILED: ['CANCELLED']
+    }[order.status] || [];
+    const paidOnline = ['VNPAY', 'E_WALLET'].includes(String(order.paymentMethod).toUpperCase())
+        && ['PAID', 'RECONCILIATION_REQUIRED'].includes(String(order.paymentStatus).toUpperCase());
+    return options.filter(status => status !== 'CANCELLED' || !paidOnline);
+}
+
 function getOrderStatusControl(order) {
-    const status = order.status;
-    const orderId = safeOrderId(order.id);
-    
-    // If order is in status that admin can't control, show badge only
-    if (status === 'SHIPPING' || status === 'DELIVERED' || status === 'FAILED' || status === 'CANCELLED') {
-        return getStatusBadge(status);
-    }
-    
-    // Admin can only control PENDING and PROCESSING
-    return `
-        <select class="status-select ${getStatusClass(status)}" 
-                onchange="updateOrderStatus(${orderId}, this.value)">
-            <option value="PENDING" ${status === 'PENDING' ? 'selected' : ''}>Chờ xử lý</option>
-            <option value="PROCESSING" ${status === 'PROCESSING' ? 'selected' : ''}>Đang xử lý</option>
-        </select>
-    `;
+    const options = allowedOrderTransitions(order);
+    if (!options.length) return getStatusBadge(order.status);
+    const id = safeOrderId(order.id);
+    return `<select class="status-select ${getStatusClass(order.status)}" aria-label="Trạng thái đơn ${id}"
+        onchange="updateOrderStatus(${id}, this.value)">
+        <option value="" selected disabled>${escapeOrderText(getStatusText(order.status))}</option>
+        ${options.map(status => `<option value="${status}">${getStatusText(status)}</option>`).join('')}
+    </select>`;
 }
 
 function filterByStatus(status, element) {
@@ -338,6 +343,7 @@ function searchOrders() {
 }
 
 async function updateOrderStatus(orderId, newStatus) {
+    if (!safeOrderId(orderId) || pendingOrderUpdates.has(orderId)) return;
     const token = localStorage.getItem('authToken') || localStorage.getItem('token');
     const userEmail = localStorage.getItem('authEmail') || localStorage.getItem('userEmail');
     
@@ -346,6 +352,7 @@ async function updateOrderStatus(orderId, newStatus) {
         return;
     }
     
+    pendingOrderUpdates.add(orderId);
     try {
         const response = await fetch(`/api/admin/orders/${orderId}/status`, {
             method: 'PUT',
@@ -369,6 +376,8 @@ async function updateOrderStatus(orderId, newStatus) {
         console.error('Error updating order status:', error);
         showToast(error.message || 'Không thể cập nhật trạng thái!', 'danger');
         loadOrders(); // Reload to reset select
+    } finally {
+        pendingOrderUpdates.delete(orderId);
     }
 }
 
@@ -562,6 +571,9 @@ function displayOrderDetail(order) {
 
 function getStatusText(status) {
     const texts = {
+        'PENDING_PAYMENT': 'Chờ thanh toán',
+        'CONFIRMED': 'Đã xác nhận',
+        'REFUNDED': 'Đã hoàn tiền',
         'PENDING': 'Chờ xử lý',
         'PROCESSING': 'Đang xử lý',
         'SHIPPING': 'Đang giao',

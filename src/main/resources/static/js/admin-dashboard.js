@@ -131,11 +131,9 @@ async function loadDashboardStats() {
             });
             
             // Check for pending orders alert
-            if (orderStats.pending > 0) {
-                document.getElementById('pendingCount').textContent = orderStats.pending;
-                document.getElementById('pendingOrderAlert').classList.remove('d-none');
-                document.getElementById('noAlerts').classList.add('d-none');
-            }
+            document.getElementById('pendingCount').textContent = orderStats.pending || 0;
+            document.getElementById('pendingOrderAlert').classList.toggle('d-none', !(orderStats.pending > 0));
+            updateNoAlerts();
         }
 
         // Load revenue stats
@@ -192,25 +190,17 @@ function animateCounter(elementId, target) {
 
 // Update alerts
 function updateAlerts(productStats) {
-    let hasAlerts = false;
-    
-    if (productStats.lowStockProducts > 0) {
-        document.getElementById('lowStockCount').textContent = productStats.lowStockProducts;
-        document.getElementById('lowStockAlert').classList.remove('d-none');
-        document.getElementById('noAlerts').classList.add('d-none');
-        hasAlerts = true;
-    }
-    
-    if (productStats.outOfStockProducts > 0) {
-        document.getElementById('outOfStockCount').textContent = productStats.outOfStockProducts;
-        document.getElementById('outOfStockAlert').classList.remove('d-none');
-        document.getElementById('noAlerts').classList.add('d-none');
-        hasAlerts = true;
-    }
-    
-    if (!hasAlerts) {
-        document.getElementById('noAlerts').classList.remove('d-none');
-    }
+    document.getElementById('lowStockCount').textContent = productStats.lowStockProducts || 0;
+    document.getElementById('outOfStockCount').textContent = productStats.outOfStockProducts || 0;
+    document.getElementById('lowStockAlert').classList.toggle('d-none', !(productStats.lowStockProducts > 0));
+    document.getElementById('outOfStockAlert').classList.toggle('d-none', !(productStats.outOfStockProducts > 0));
+    updateNoAlerts();
+}
+
+function updateNoAlerts() {
+    const hasAlerts = ['lowStockAlert', 'outOfStockAlert', 'pendingOrderAlert'].some(id =>
+        !document.getElementById(id).classList.contains('d-none'));
+    document.getElementById('noAlerts').classList.toggle('d-none', hasAlerts);
 }
 
 // Chart instances
