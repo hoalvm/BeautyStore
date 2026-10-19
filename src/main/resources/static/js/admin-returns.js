@@ -4,6 +4,8 @@ let currentPage = 0;
 let totalPages = 0;
 let selectedReturn = null;
 let returnModal = null;
+let returnMutationPending = false;
+let returnsRequest = 0;
 
 document.addEventListener('DOMContentLoaded', () => {
     const token = authToken();
@@ -19,10 +21,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('refreshButton').addEventListener('click', loadReturns);
     document.getElementById('prevPage').addEventListener('click', () => { if (currentPage > 0) { currentPage -= 1; loadReturns(); } });
     document.getElementById('nextPage').addEventListener('click', () => { if (currentPage + 1 < totalPages) { currentPage += 1; loadReturns(); } });
-    document.getElementById('logoutButton').addEventListener('click', () => {
-        fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin', keepalive: true })
-            .catch(() => {});
-        localStorage.clear();
+    document.getElementById('logoutButton').addEventListener('click', async () => {
+        await window.clearBeautySession?.();
         location.href = '/login';
     });
     loadReturns();
@@ -32,6 +32,7 @@ function authToken() { return localStorage.getItem('authToken') || localStorage.
 function headers(json = false) { const value = { Authorization: `Bearer ${authToken()}` }; if (json) value['Content-Type'] = 'application/json'; return value; }
 
 async function loadReturns() {
+    const request = ++returnsRequest;
     tableMessage('Đang tải yêu cầu…');
     const params = new URLSearchParams({ page: String(currentPage), size: document.getElementById('pageSize').value });
     const status = document.getElementById('statusFilter').value;
@@ -40,13 +41,18 @@ async function loadReturns() {
         const response = await fetch(`/api/admin/returns?${params}`, { headers: headers() });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(payload.message || 'Không thể tải yêu cầu đổi trả.');
+        if (request !== returnsRequest) return;
         totalPages = Number(payload.totalPages || 0);
+        if (currentPage > 0 && currentPage >= totalPages) {
+            currentPage = Math.max(0, totalPages - 1);
+            return loadReturns();
+        }
         renderRows(payload.content || []);
         const total = Number(payload.totalElements || 0);
         document.getElementById('pageInfo').textContent = total ? `Trang ${currentPage + 1}/${Math.max(totalPages, 1)} · ${total} yêu cầu` : 'Chưa có yêu cầu';
         document.getElementById('prevPage').disabled = currentPage === 0;
         document.getElementById('nextPage').disabled = currentPage + 1 >= totalPages;
-    } catch (error) { tableMessage(error.message, true); }
+    } catch (error) { if (request === returnsRequest) tableMessage(error.message, true); }
 }
 
 function renderRows(items) {
@@ -102,6 +108,7 @@ function renderActions(request) {
 }
 
 async function transition(id, status) {
+    if (returnMutationPending) return;
     const adminNote = prompt(status === 'REJECTED' ? 'Nhập lý do từ chối:' : 'Ghi chú xử lý (có thể để trống):') ?? null;
     if (adminNote === null) return;
     let refundReference = null;
@@ -110,6 +117,7 @@ async function transition(id, status) {
 }
 
 async function restockItems(id) {
+    if (returnMutationPending) return;
     const returnItemIds = [...document.querySelectorAll('.restock-item:checked')].map(input => Number(input.value)).filter(Number.isFinite);
     if (!returnItemIds.length) { notify('Hãy chọn ít nhất một sản phẩm đủ điều kiện.', 'warning'); return; }
     if (!confirm('Xác nhận hàng còn đủ điều kiện và nhập lại đúng các lô xuất ban đầu?')) return;
@@ -117,12 +125,17 @@ async function restockItems(id) {
 }
 
 async function mutate(url, method, body) {
+    if (returnMutationPending) return;
+    returnMutationPending = true;
+    const buttons = [...document.querySelectorAll('#returnActions button')];
+    buttons.forEach(button => { button.disabled = true; });
     try {
         const response = await fetch(url, { method, headers: headers(true), body: JSON.stringify(body) });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(payload.message || 'Không thể cập nhật yêu cầu.');
         notify('Đã cập nhật yêu cầu đổi trả.', 'success'); returnModal.hide(); await loadReturns();
     } catch (error) { notify(error.message, 'danger'); }
+    finally { returnMutationPending = false; buttons.forEach(button => { button.disabled = false; }); }
 }
 
 function tableMessage(message, danger = false) { const row = document.createElement('tr'); const item = element('td', `text-center py-5 ${danger ? 'text-danger' : 'text-muted'}`, message); item.colSpan=6; row.appendChild(item); document.getElementById('returnsBody').replaceChildren(row); }

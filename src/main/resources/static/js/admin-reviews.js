@@ -1,6 +1,8 @@
 let currentPage = 0;
 let pageSize = 10;
 let currentReviews = [];
+let reviewsRequest = 0;
+const pendingModerations = new Set();
 
 document.addEventListener('DOMContentLoaded', () => {
     if (!checkAdminAuth()) return;
@@ -26,6 +28,7 @@ function authHeaders() {
 }
 
 async function loadReviews() {
+    const request = ++reviewsRequest;
     const body = document.getElementById('reviewsTableBody');
     showTableMessage('Đang tải đánh giá...');
     const status = document.getElementById('minStars')?.value || '';
@@ -35,11 +38,17 @@ async function loadReviews() {
         const response = await fetch(`/api/admin/reviews?${params}`, { headers: authHeaders() });
         if (!response.ok) throw new Error('Không thể tải đánh giá.');
         const data = await response.json();
+        if (request !== reviewsRequest) return;
+        if (currentPage > 0 && currentPage >= Number(data.totalPages || 0)) {
+            currentPage = Math.max(0, Number(data.totalPages || 0) - 1);
+            return loadReviews();
+        }
         currentReviews = filterLocally(data.content || []);
         renderReviews(currentReviews);
         updateStatistics(data, currentReviews);
         updatePagination(data);
     } catch (error) {
+        if (request !== reviewsRequest) return;
         showTableMessage(error.message, true);
     }
 }
@@ -121,8 +130,10 @@ function actionButton(label, style, status) {
 }
 
 async function moderateReview(id, status) {
+    if (pendingModerations.has(id)) return;
     const label = status === 'APPROVED' ? 'duyệt' : 'từ chối';
     if (!confirm(`Xác nhận ${label} đánh giá này?`)) return;
+    pendingModerations.add(id);
     try {
         const response = await fetch(`/api/admin/reviews/${id}/status?status=${status}`, { method: 'PATCH', headers: authHeaders() });
         const data = await response.json().catch(() => ({}));
@@ -130,6 +141,7 @@ async function moderateReview(id, status) {
         notify(`Đã ${label} đánh giá.`, 'success');
         loadReviews();
     } catch (error) { notify(error.message, 'danger'); }
+    finally { pendingModerations.delete(id); }
 }
 
 function updateStatistics(data, reviews) {
@@ -146,12 +158,15 @@ function updatePagination(data) {
     const total = Number(data.totalElements || 0);
     const from = total ? currentPage * pageSize + 1 : 0;
     const to = Math.min(total, (currentPage + 1) * pageSize);
-    document.getElementById('paginationInfo').textContent = `Hiển thị ${from}–${to} trong ${total} đánh giá`;
-    for (let page = 0; page < Number(data.totalPages || 0); page += 1) {
+    document.getElementById('paginationInfo').textContent = `Trang có ${from}–${to} trong ${total} đánh giá · ${currentReviews.length} khớp bộ lọc trên trang`;
+    const totalPages = Number(data.totalPages || 0);
+    const pages = new Set([0, currentPage - 1, currentPage, currentPage + 1, totalPages - 1]);
+    for (const page of [...pages].filter(page => page >= 0 && page < totalPages).sort((a, b) => a - b)) {
         const item = document.createElement('li');
         item.className = `page-item${page === currentPage ? ' active' : ''}`;
         const button = node('button', 'page-link', String(page + 1));
         button.type = 'button';
+        if (page === currentPage) button.setAttribute('aria-current', 'page');
         button.addEventListener('click', () => { currentPage = page; loadReviews(); });
         item.appendChild(button);
         controls.appendChild(item);
@@ -168,6 +183,7 @@ function showTableMessage(message, error = false) {
 }
 
 function applyFilters() { currentPage = 0; loadReviews(); }
+function refreshReviews() { return loadReviews(); }
 function clearFilters() {
     ['userNameSearch', 'productNameSearch', 'minStars', 'maxStars', 'startDate', 'endDate'].forEach(id => { const element = document.getElementById(id); if (element) element.value = ''; });
     currentPage = 0;
