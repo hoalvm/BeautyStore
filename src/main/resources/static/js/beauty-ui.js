@@ -22,7 +22,7 @@
         if (!candidate) return fallback;
         try {
             const url = new URL(candidate, window.location.origin);
-            if (['http:', 'https:'].includes(url.protocol) || url.origin === window.location.origin) {
+            if (['http:', 'https:'].includes(url.protocol)) {
                 return url.href;
             }
         } catch (_) {
@@ -32,7 +32,8 @@
     }
 
     function brandName(product) {
-        return text(product?.brand?.name || product?.brandName || product?.brand, 'BeautyStore');
+        return text(product?.brand?.name || product?.brandName
+            || (typeof product?.brand === 'string' ? product.brand : ''), 'BeautyStore');
     }
 
     function activeVariants(product) {
@@ -50,18 +51,46 @@
         const selected = variant || defaultVariant(product);
         const gallery = Array.isArray(product?.gallery) ? product.gallery : [];
         const image = selected?.imageUrl
-            || gallery.find(item => item?.variantId === selected?.id && item?.primary)?.url
-            || gallery.find(item => item?.variantId === selected?.id)?.url
-            || gallery.find(item => item?.primary)?.url
-            || gallery[0]?.url;
+            || gallery.find(item => selected?.id != null && item?.variantId === selected.id && item?.primary)?.url
+            || gallery.find(item => selected?.id != null && item?.variantId === selected.id)?.url
+            || gallery.find(item => item?.variantId == null && item?.primary)?.url
+            || gallery.find(item => item?.variantId == null)?.url;
         return safeUrl(image);
     }
 
     function currentPrice(product, variant) {
         const selected = variant || defaultVariant(product);
         const regular = Number(selected?.price ?? product?.minPrice ?? 0);
-        const sale = Number(selected?.discountPrice ?? 0);
-        return sale > 0 && sale < regular ? sale : regular;
+        const sale = selected?.discountPrice == null ? NaN : Number(selected.discountPrice);
+        return Number.isFinite(sale) && sale >= 0 && sale < regular
+            ? sale : (Number.isFinite(regular) && regular >= 0 ? regular : 0);
+    }
+
+    function variantLabel(variant) {
+        const size = variant?.sizeValue ?? variant?.volume;
+        const unit = variant?.sizeUnit ?? variant?.volumeUnit;
+        return text(variant?.label || [variant?.shadeName, size != null && `${size} ${unit || ''}`]
+            .filter(Boolean).join(' · '));
+    }
+
+    function isAvailable(product) {
+        return product?.active !== false && product?.brand?.active !== false
+            && product?.category?.active !== false
+            && !(product?.categoryBreadcrumb || []).some(category => category.active === false)
+            && activeVariants(product).some(variant => Number(variant.availableStock) > 0);
+    }
+
+    // Java LocalDateTime is store-local (+07:00), not the visitor's timezone.
+    function parseBusinessDate(value) {
+        if (typeof value !== 'string' || !value.trim()) return new Date(NaN);
+        const normalized = value.trim();
+        const localTimestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?$/;
+        return new Date(localTimestamp.test(normalized) ? `${normalized}+07:00` : normalized);
+    }
+
+    async function errorMessage(response, fallback = 'Không thể hoàn tất yêu cầu. Vui lòng thử lại.') {
+        const payload = await response.json().catch(() => null);
+        return typeof payload?.message === 'string' && payload.message.trim() ? payload.message : fallback;
     }
 
     function priceRange(product) {
@@ -123,10 +152,14 @@
         brandName,
         activeVariants,
         defaultVariant,
+        variantLabel,
+        isAvailable,
         productImage,
         currentPrice,
         priceRange,
         formatPrice,
+        parseBusinessDate,
+        errorMessage,
         productHref,
         facetLabels,
         setBusy,
