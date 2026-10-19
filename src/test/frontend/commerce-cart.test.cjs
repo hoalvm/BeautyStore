@@ -39,3 +39,7 @@ test('cart subtotal changes invalidate stale voucher and zero all totals', () =>
     assert.equal(nodes.get('subtotalPrice').textContent, context.formatPrice(0));
     assert.equal(nodes.get('totalPrice').textContent, context.formatPrice(0));
 });
+test('cart does not classify an unknown zero-discount voucher as free shipping', () => {
+    const {context,storage} = load(); storage.set('voucherCode','UNKNOWN'); storage.set('voucherDiscount','0');
+    assert.equal(context.getStoredVoucherState().freeShipping,false);
+});

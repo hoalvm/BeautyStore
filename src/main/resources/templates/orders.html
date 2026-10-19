@@ -150,16 +150,16 @@
                 <div class="text-center mb-4">
                     <p class="mb-2">Chọn số sao:</p>
                     <div class="star-rating" id="starRating">
-                        <i class="far fa-star star" data-rating="1"></i>
-                        <i class="far fa-star star" data-rating="2"></i>
-                        <i class="far fa-star star" data-rating="3"></i>
-                        <i class="far fa-star star" data-rating="4"></i>
-                        <i class="far fa-star star" data-rating="5"></i>
+                        <button type="button" class="far fa-star star border-0 bg-transparent" data-rating="1" aria-label="1 sao" aria-pressed="false"></button>
+                        <button type="button" class="far fa-star star border-0 bg-transparent" data-rating="2" aria-label="2 sao" aria-pressed="false"></button>
+                        <button type="button" class="far fa-star star border-0 bg-transparent" data-rating="3" aria-label="3 sao" aria-pressed="false"></button>
+                        <button type="button" class="far fa-star star border-0 bg-transparent" data-rating="4" aria-label="4 sao" aria-pressed="false"></button>
+                        <button type="button" class="far fa-star star border-0 bg-transparent" data-rating="5" aria-label="5 sao" aria-pressed="false"></button>
                     </div>
                 </div>
                 <div class="mb-3">
                     <label class="form-label" for="reviewTitle">Tiêu đề</label>
-                    <input class="form-control" id="reviewTitle" maxlength="160" placeholder="Tóm tắt trải nghiệm của bạn">
+                    <input class="form-control" id="reviewTitle" maxlength="120" placeholder="Tóm tắt trải nghiệm của bạn">
                 </div>
                 <div class="mb-3">
                     <label class="form-label" for="reviewContent">Nội dung đánh giá</label>
@@ -167,7 +167,7 @@
                 </div>
                 <div class="mb-3">
                     <label class="form-label" for="reviewSkinType">Loại da (tùy chọn)</label>
-                    <input class="form-control" id="reviewSkinType" maxlength="80" placeholder="Ví dụ: Da hỗn hợp, nhạy cảm">
+                    <input class="form-control" id="reviewSkinType" maxlength="50" placeholder="Ví dụ: Da hỗn hợp, nhạy cảm">
                 </div>
                 <div class="mb-2">
                     <label class="form-label" for="reviewImages">Ảnh thực tế (tối đa 5 ảnh)</label>
@@ -215,12 +215,13 @@ async function loadOrders() {
     const ordersLoading = document.getElementById('ordersLoading');
     const emptyOrders = document.getElementById('emptyOrders');
     const ordersList = document.getElementById('ordersList');
+    ordersLoading.style.display = 'block';
+    emptyOrders.style.display = 'none';
+    ordersList.style.display = 'none';
 
     try {
         const token = localStorage.getItem('authToken') || localStorage.getItem('token');
-        const userEmail = localStorage.getItem('authEmail') || localStorage.getItem('userEmail');
-        
-        if (!token || !userEmail) {
+        if (!token) {
             window.location.href = '/login';
             return;
         }
@@ -371,6 +372,7 @@ function getStatusBadgeClass(status) {
         'SHIPPING': 'bg-primary',
         'DELIVERED': 'bg-success',
         'CANCELLED': 'bg-danger',
+        'FAILED': 'bg-danger',
         'REFUNDED': 'bg-secondary'
     };
     return classes[status] || 'bg-secondary';
@@ -385,6 +387,7 @@ function getStatusText(status) {
         'SHIPPING': '🚚 Đang giao hàng',
         'DELIVERED': '✨ Đã giao hàng',
         'CANCELLED': '❌ Đã hủy',
+        'FAILED': 'Giao hàng không thành công',
         'REFUNDED': '💰 Đã hoàn tiền'
     };
     return texts[status] || 'Không xác định';
@@ -412,8 +415,10 @@ function formatPrice(price) {
 }
 
 function formatDate(dateString) {
-    const date = new Date(dateString);
+    const date = BeautyUI.parseBusinessDate(dateString);
+    if (!Number.isFinite(date.getTime())) return 'Đang cập nhật';
     return date.toLocaleDateString('vi-VN', {
+        timeZone: 'Asia/Ho_Chi_Minh',
         year: 'numeric',
         month: 'long',
         day: 'numeric',
@@ -463,9 +468,7 @@ document.addEventListener('DOMContentLoaded', function() {
 async function performCancelOrder() {
     try {
         const token = localStorage.getItem('authToken') || localStorage.getItem('token');
-        const userEmail = localStorage.getItem('authEmail') || localStorage.getItem('userEmail');
-        
-        if (!token || !userEmail) {
+        if (!token) {
             showErrorModal('Vui lòng đăng nhập để hủy đơn hàng!');
             setTimeout(() => window.location.href = '/login', 2000);
             return;
@@ -488,7 +491,7 @@ async function performCancelOrder() {
         const data = await response.json();
 
         if (!response.ok) {
-            showErrorModal(data.error || 'Không thể hủy đơn hàng. Vui lòng thử lại!');
+            showErrorModal(data.message || data.error || 'Không thể hủy đơn hàng. Vui lòng thử lại!');
             return;
         }
 
@@ -538,6 +541,7 @@ function showErrorModal(message) {
 
 let currentReviewOrderItemId = null;
 let selectedStars = 0;
+let reviewSubmitting = false;
 
 function openReviewModal(orderItemId, productName) {
     currentReviewOrderItemId = safePositiveInteger(orderItemId);
@@ -555,6 +559,7 @@ function openReviewModal(orderItemId, productName) {
     stars.forEach(star => {
         star.classList.remove('active', 'fas');
         star.classList.add('far');
+        star.setAttribute('aria-pressed', 'false');
     });
     
     // Show modal
@@ -569,9 +574,13 @@ function setupStarRating() {
     const stars = document.querySelectorAll('.star-rating .star');
     
     stars.forEach(star => {
+        if (star.dataset.ratingBound === 'true') return;
+        star.dataset.ratingBound = 'true';
         star.addEventListener('click', function() {
+            if (reviewSubmitting) return;
             selectedStars = parseInt(this.getAttribute('data-rating'));
             updateStarDisplay(selectedStars);
+            stars.forEach(item => item.setAttribute('aria-pressed', String(Number(item.dataset.rating) === selectedStars)));
             document.getElementById('submitRatingBtn').disabled = false;
         });
         
@@ -581,9 +590,9 @@ function setupStarRating() {
         });
     });
     
-    document.getElementById('starRating').addEventListener('mouseleave', function() {
+    document.getElementById('starRating').onmouseleave = function() {
         updateStarDisplay(selectedStars);
-    });
+    };
 }
 
 function updateStarDisplay(rating) {
@@ -607,6 +616,8 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 async function submitReview() {
+    if (reviewSubmitting) return;
+    if (!document.getElementById('reviewContent').reportValidity()) return;
     if (selectedStars === 0) {
         showErrorModal('Vui lòng chọn số sao đánh giá!');
         return;
@@ -620,12 +631,16 @@ async function submitReview() {
     }
     
     const submitBtn = document.getElementById('submitRatingBtn');
+    reviewSubmitting = true;
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang gửi...';
     
     try {
         const files = Array.from(document.getElementById('reviewImages').files || []);
         if (files.length > 5) throw new Error('Mỗi đánh giá có tối đa 5 ảnh.');
+        if (files.some(file => !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024)) {
+            throw new Error('Ảnh phải là JPEG, PNG hoặc WebP và không quá 10 MB.');
+        }
         const imageUrls = [];
         for (const file of files) {
             const formData = new FormData();
@@ -683,6 +698,7 @@ async function submitReview() {
         console.error('Error submitting rating:', error);
         showErrorModal(error.message || 'Không thể gửi đánh giá. Vui lòng thử lại!');
     } finally {
+        reviewSubmitting = false;
         submitBtn.disabled = false;
         submitBtn.innerHTML = '<i class="fas fa-paper-plane me-2"></i>Gửi đánh giá';
     }

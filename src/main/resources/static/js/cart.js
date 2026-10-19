@@ -136,12 +136,14 @@ function createCartItemElement(item) {
 
     // Set stock
     const availableStock = Math.max(0, Number(item.availableStock) || 0);
+    const maximumQuantity = Math.min(999, availableStock);
     clone.querySelector('.cart-item-stock').textContent = String(availableStock);
 
     // Set quantity
     const quantityInput = clone.querySelector('.quantity-input');
     quantityInput.value = item.quantity;
-    quantityInput.max = String(availableStock);
+    quantityInput.max = String(maximumQuantity);
+    quantityInput.setAttribute('aria-label', `Số lượng ${item.productName || 'sản phẩm'}`);
 
     // Set subtotal
     clone.querySelector('.cart-item-subtotal').textContent = formatPrice(item.subtotal);
@@ -150,6 +152,9 @@ function createCartItemElement(item) {
     const decreaseBtn = clone.querySelector('.quantity-decrease');
     const increaseBtn = clone.querySelector('.quantity-increase');
     const removeBtn = clone.querySelector('.remove-item');
+    decreaseBtn.setAttribute('aria-label', `Giảm số lượng ${item.productName || 'sản phẩm'}`);
+    increaseBtn.setAttribute('aria-label', `Tăng số lượng ${item.productName || 'sản phẩm'}`);
+    removeBtn.setAttribute('aria-label', `Xóa ${item.productName || 'sản phẩm'} khỏi giỏ`);
 
     if (item.available !== true) {
         cartItemDiv.classList.add('border-danger', 'bg-light', 'opacity-75');
@@ -178,7 +183,7 @@ function createCartItemElement(item) {
     });
 
     increaseBtn.addEventListener('click', () => {
-        if (parseInt(quantityInput.value) < availableStock) {
+        if (parseInt(quantityInput.value) < maximumQuantity) {
             quantityInput.value = parseInt(quantityInput.value) + 1;
             updateCartItemQuantity(item.id, parseInt(quantityInput.value));
         } else {
@@ -190,8 +195,8 @@ function createCartItemElement(item) {
         let value = Number(quantityInput.value);
         if (!Number.isSafeInteger(value)) value = Math.max(1, Math.floor(Number(item.quantity) || 1));
         if (value < 1) value = 1;
-        if (value > availableStock) {
-            value = availableStock;
+        if (value > maximumQuantity) {
+            value = maximumQuantity;
             showNotification('Không đủ số lượng trong kho!', 'warning');
         }
         quantityInput.value = value;
@@ -505,13 +510,11 @@ async function applyVoucher() {
         
         if (result.valid) {
             const discountAmount = Math.max(0, Number(result.discountAmount) || 0);
-            // API hiện tại trả discountAmount=0 cho FREE_SHIPPING. Các tên field
-            // bổ sung dưới đây giúp client tương thích khi API cung cấp metadata rõ hơn.
+            // Prefer explicit voucher metadata; a zero discount is not proof of free shipping.
             const freeShipping = result.freeShipping === true
                 || result.discountType === 'FREE_SHIPPING'
                 || result.voucherType === 'FREE_SHIPPING'
-                || Number(result.shippingDiscount) > 0
-                || discountAmount === 0;
+                || Number(result.shippingDiscount) > 0;
             // Save voucher info to localStorage
             localStorage.setItem('voucherCode', result.voucherCode || voucherCode);
             localStorage.setItem('voucherDiscount', String(discountAmount));
@@ -593,10 +596,9 @@ function getStoredVoucherState() {
     const discountAmount = Math.max(0, parseFloat(localStorage.getItem('voucherDiscount')) || 0);
     const explicitFreeShipping = localStorage.getItem('voucherFreeShipping');
     const type = localStorage.getItem('voucherType');
-    // Mã hợp lệ có discount=0 từ API hiện tại chính là FREE_SHIPPING.
+    // Only explicit metadata can waive shipping.
     const freeShipping = Boolean(code) && (explicitFreeShipping === 'true'
-        || type === 'FREE_SHIPPING'
-        || (explicitFreeShipping === null && type === null && discountAmount === 0));
+        || type === 'FREE_SHIPPING');
     return { code, discountAmount, freeShipping };
 }
 
