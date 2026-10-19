@@ -1,4 +1,7 @@
 // Cart functionality
+let cartMutationPending = false;
+let cartLoadVersion = 0;
+let voucherRequestVersion = 0;
 document.addEventListener('DOMContentLoaded', function() {
     loadCart();
 
@@ -23,6 +26,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Load cart from API
 async function loadCart() {
+    const loadVersion = ++cartLoadVersion;
     const cartLoading = document.getElementById('cartLoading');
     const emptyCartMessage = document.getElementById('emptyCartMessage');
     const cartItemsList = document.getElementById('cartItemsList');
@@ -46,6 +50,7 @@ async function loadCart() {
         }
 
         const cart = await response.json();
+        if (loadVersion !== cartLoadVersion) return;
 
         // Hide loading
         if (cartLoading) cartLoading.style.display = 'none';
@@ -81,8 +86,8 @@ async function loadCart() {
             cartItemsList.replaceChildren();
             
             // Update summary to zero
-            document.getElementById('totalItems').textContent = '0';
-            document.getElementById('totalPrice').textContent = '0 ₫';
+            clearCartVoucher();
+            updateCartSummary({totalItems: 0, totalPrice: 0});
 
             // Disable buttons
             if (checkoutBtn) {
@@ -92,6 +97,8 @@ async function loadCart() {
             if (clearCartBtn) clearCartBtn.disabled = true;
         }
     } catch (error) {
+        if (loadVersion !== cartLoadVersion) return;
+        if (checkoutBtn) checkoutBtn.disabled = true;
         console.error('Error loading cart:', error);
         if (cartLoading) {
             cartLoading.innerHTML = `
@@ -180,7 +187,8 @@ function createCartItemElement(item) {
     });
 
     quantityInput.addEventListener('change', () => {
-        let value = parseInt(quantityInput.value);
+        let value = Number(quantityInput.value);
+        if (!Number.isSafeInteger(value)) value = Math.max(1, Math.floor(Number(item.quantity) || 1));
         if (value < 1) value = 1;
         if (value > availableStock) {
             value = availableStock;
@@ -199,6 +207,7 @@ function createCartItemElement(item) {
 
 // Update cart item quantity
 async function updateCartItemQuantity(itemId, quantity) {
+    if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 999 || !beginCartMutation()) return;
     try {
         const token = localStorage.getItem('authToken') || localStorage.getItem('token');
         const headers = { 'Content-Type': 'application/json' };
@@ -215,19 +224,7 @@ async function updateCartItemQuantity(itemId, quantity) {
             throw new Error(error.message || error.error || 'Không thể cập nhật sản phẩm');
         }
 
-        const cart = await response.json();
-        
-        // Update the specific item's subtotal
-        const itemElement = document.querySelector(`[data-item-id="${itemId}"]`);
-        if (itemElement) {
-            const itemData = cart.items.find(i => i.id === itemId);
-            if (itemData) {
-                itemElement.querySelector('.cart-item-subtotal').textContent = formatPrice(itemData.subtotal);
-            }
-        }
-
-        // Update summary
-        updateCartSummary(cart);
+        clearCartVoucher();
         showNotification('Đã cập nhật số lượng!', 'success');
         
         // Update cart badge
@@ -238,26 +235,26 @@ async function updateCartItemQuantity(itemId, quantity) {
         console.error('Error updating cart item:', error);
         showNotification(error.message || 'Không thể cập nhật số lượng!', 'error');
         // Reload cart to reset values
-        loadCart();
+    } finally {
+        await loadCart();
+        endCartMutation();
     }
 }
 
 // Remove cart item
 async function removeCartItem(itemId) {
-    console.log('Attempting to remove item with ID:', itemId);
+    if (!beginCartMutation()) return;
 
     try {
         const token = localStorage.getItem('authToken') || localStorage.getItem('token');
         const headers = { 'Content-Type': 'application/json' };
         if (token) headers.Authorization = `Bearer ${token}`;
-        console.log('Sending DELETE request to:', `/api/cart/items/${itemId}`);
         const response = await fetch(`/api/cart/items/${itemId}`, {
             method: 'DELETE',
             headers,
             credentials: 'same-origin'
         });
 
-        console.log('Response status:', response.status);
         
         if (!response.ok) {
             const error = await response.json();
@@ -265,26 +262,27 @@ async function removeCartItem(itemId) {
             throw new Error(error.message || error.error || 'Không thể xóa sản phẩm');
         }
 
-        console.log('Successfully removed item');
+        clearCartVoucher();
         showNotification('Đã xóa sản phẩm khỏi giỏ hàng!', 'success');
         
         // Update cart badge immediately
         if (typeof updateCartBadge === 'function') {
-            console.log('Updating cart badge...');
             updateCartBadge();
         }
         
         // Reload cart
-        console.log('Reloading cart...');
-        loadCart();
     } catch (error) {
         console.error('Error removing cart item:', error);
         showNotification(error.message || 'Không thể xóa sản phẩm!', 'error');
+    } finally {
+        await loadCart();
+        endCartMutation();
     }
 }
 
 // Clear entire cart
 async function clearCart() {
+    if (!beginCartMutation()) return;
     try {
         const token = localStorage.getItem('authToken') || localStorage.getItem('token');
         const headers = { 'Content-Type': 'application/json' };
@@ -302,6 +300,7 @@ async function clearCart() {
         }
 
         showNotification('Đã xóa toàn bộ giỏ hàng!', 'success');
+        clearCartVoucher();
         
         // Reset cart badge immediately
         if (typeof updateCartBadge === 'function') {
@@ -309,16 +308,43 @@ async function clearCart() {
         }
         
         // Reload cart
-        loadCart();
     } catch (error) {
         console.error('Error clearing cart:', error);
         showNotification(error.message || 'Không thể xóa giỏ hàng!', 'error');
+    } finally {
+        await loadCart();
+        endCartMutation();
     }
+}
+
+function beginCartMutation() {
+    if (cartMutationPending) return false;
+    cartMutationPending = true;
+    document.querySelectorAll('#cartItemsList button, #cartItemsList input, #clearCartBtn, #checkoutBtn, #applyVoucherBtn').forEach(control => {
+        control.dataset.cartWasDisabled = String(control.disabled);
+        control.disabled = true;
+    });
+    return true;
+}
+
+function endCartMutation() {
+    cartMutationPending = false;
+    document.querySelectorAll('[data-cart-was-disabled]').forEach(control => {
+        // loadCart owns the refreshed checkout/clear availability.
+        if (!['checkoutBtn', 'clearCartBtn'].includes(control.id)) control.disabled = control.dataset.cartWasDisabled === 'true';
+        delete control.dataset.cartWasDisabled;
+    });
+}
+
+function clearCartVoucher() {
+    voucherRequestVersion += 1;
+    ['voucherCode', 'voucherDiscount', 'voucherFreeShipping', 'voucherType', 'voucherShippingDiscount'].forEach(key => localStorage.removeItem(key));
 }
 
 // Update cart summary
 function updateCartSummary(cart) {
     const subtotal = cart.totalPrice || 0;
+    if (Number(localStorage.getItem('cartSubtotal')) !== Number(subtotal)) clearCartVoucher();
     document.getElementById('totalItems').textContent = cart.totalItems || 0;
     document.getElementById('subtotalPrice').textContent = formatPrice(subtotal);
     
@@ -440,6 +466,8 @@ function setupVoucherHandlers() {
 }
 
 async function applyVoucher() {
+    if (cartMutationPending) return;
+    const requestVersion = ++voucherRequestVersion;
     const voucherInput = document.getElementById('voucherCodeInput');
     const voucherCode = voucherInput.value.trim().toUpperCase();
     if (!voucherCode) {
@@ -470,6 +498,7 @@ async function applyVoucher() {
         });
 
         const result = await response.json().catch(() => ({}));
+        if (requestVersion !== voucherRequestVersion || cartMutationPending) return;
         if (!response.ok) {
             throw new Error(result.message || 'Không thể kiểm tra mã giảm giá');
         }
@@ -513,6 +542,7 @@ async function applyVoucher() {
 }
 
 function removeVoucher() {
+    voucherRequestVersion += 1;
     // Clear voucher from localStorage
     localStorage.removeItem('voucherCode');
     localStorage.removeItem('voucherDiscount');
