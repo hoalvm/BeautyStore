@@ -25,16 +25,16 @@
                 <button type="button" class="btn-close btn-close-white ms-auto" id="chatbot-close" aria-label="Đóng trợ lý"></button>
             </div>
             <div class="chatbot-messages" id="chatbot-messages" aria-live="polite"></div>
-            <div class="suggestions-toggle collapsed" id="suggestions-toggle">
+            <button type="button" class="suggestions-toggle collapsed" id="suggestions-toggle" aria-expanded="false" aria-controls="chatbot-suggestions">
                 <span>Gợi ý nhanh</span>
                 <span class="arrow">▼</span>
-            </div>
+            </button>
             <div class="chatbot-suggestions collapsed" id="chatbot-suggestions"></div>
             <button type="button" class="chatbot-human-support" id="chatbot-human-support">
                 <span aria-hidden="true">●</span> Chuyển sang chuyên viên
             </button>
             <div class="chatbot-input">
-                <input type="text" id="chatbot-input" placeholder="Gõ câu hỏi của bạn..." aria-label="Nhập câu hỏi">
+                <input type="text" id="chatbot-input" maxlength="1000" placeholder="Gõ câu hỏi của bạn..." aria-label="Nhập câu hỏi">
                 <button class="send" id="chatbot-send">Gửi</button>
             </div>
         </div>
@@ -71,6 +71,7 @@
     let supportMode = false;
     let supportSessionId = null;
     let supportPollTimer = null;
+    let supportPolling = false;
     const seenSupportMessages = new Set();
 
     function openBubble() {
@@ -80,23 +81,27 @@
         toggle.setAttribute('aria-expanded', 'true');
         inputEl.focus();
         renderSuggestions();
+        resumeSupportPolling();
         // initial greeting
         if (!messagesEl.hasChildNodes()) {
             pushAgentMessage('Chào bạn! Mình là trợ lý BeautyStore. Mình có thể gợi ý mỹ phẩm theo loại da, nhu cầu, thành phần, ngân sách và giải đáp chính sách. Thông tin chỉ mang tính tham khảo; nếu đang kích ứng, mang thai hoặc điều trị da, bạn nên trao đổi với chuyên gia y tế. Bạn đang cần tìm gì?');
         }
     }
 
-    function closeBubble() {
+    function closeBubble(restoreFocus = true) {
         bubble.setAttribute('aria-hidden', 'true');
         bubble.style.display = 'none';
         open = false;
         toggle.setAttribute('aria-expanded', 'false');
-        toggle.focus();
+        stopSupportPolling();
+        if (restoreFocus === true) toggle.focus();
     }
 
     // Toggle suggestions
     function toggleSuggestions() {
         suggestionsExpanded = !suggestionsExpanded;
+        suggestionsToggle.setAttribute('aria-expanded', String(suggestionsExpanded));
+        suggestionsEl.inert = !suggestionsExpanded;
         if (suggestionsExpanded) {
             suggestionsEl.classList.remove('collapsed');
             suggestionsEl.classList.add('expanded');
@@ -112,29 +117,25 @@
     toggle.addEventListener('click', () => {
         open ? closeBubble() : openBubble();
     });
-    document.getElementById('chatbot-close')?.addEventListener('click', closeBubble);
+    document.getElementById('chatbot-close')?.addEventListener('click', () => closeBubble());
     bubble.addEventListener('keydown', event => {
         if (event.key === 'Escape') closeBubble();
         if (event.key !== 'Tab') return;
-        const focusable = [...bubble.querySelectorAll('button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])')];
+        const focusable = [...bubble.querySelectorAll('button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+            .filter(element => element.getClientRects().length > 0 && !element.closest('[inert]'));
         if (!focusable.length) return;
         const first = focusable[0];
         const last = focusable.at(-1);
         if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
         else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     });
-    toggle.addEventListener('keypress', (e) => { 
-        if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            open ? closeBubble() : openBubble(); 
-        }
-    });
 
     // Toggle suggestions panel
     suggestionsToggle.addEventListener('click', toggleSuggestions);
 
     // Show/hide bubble initially closed
-    closeBubble();
+    closeBubble(false);
+    suggestionsEl.inert = true;
 
     // render suggestions
     function renderSuggestions() {
@@ -206,18 +207,30 @@
             humanSupportBtn.hidden = true;
             inputEl.placeholder = 'Nhắn cho chuyên viên BeautyStore…';
             pushAgentMessage('Bạn đã chuyển sang kênh hỗ trợ trực tiếp. Hãy để lại nội dung; chuyên viên BeautyStore sẽ phản hồi tại đây.', true);
-            await pollSupportMessages();
-            supportPollTimer = window.setInterval(pollSupportMessages, 3000);
         } catch (_) {
             pushAgentMessage('Hiện chưa thể kết nối chuyên viên. Bạn vui lòng thử lại sau hoặc liên hệ hotline của cửa hàng.', true);
             humanSupportBtn.disabled = false;
         } finally {
             isProcessing = false;
+            resumeSupportPolling();
         }
     }
 
+    function stopSupportPolling() {
+        if (supportPollTimer) window.clearInterval(supportPollTimer);
+        supportPollTimer = null;
+    }
+
+    function resumeSupportPolling() {
+        stopSupportPolling();
+        if (!open || document.hidden || !supportSessionId) return;
+        pollSupportMessages();
+        supportPollTimer = window.setInterval(pollSupportMessages, 3000);
+    }
+
     async function pollSupportMessages() {
-        if (!supportSessionId) return;
+        if (!supportSessionId || !open || document.hidden || supportPolling || isProcessing) return;
+        supportPolling = true;
         try {
             const response = await fetch(`/api/support/session/${encodeURIComponent(supportSessionId)}/messages`, {
                 credentials: 'same-origin',
@@ -225,6 +238,7 @@
             });
             if (!response.ok) return;
             const messages = await response.json();
+            if (!open || document.hidden) return;
             messages.forEach(message => {
                 if (!message.id || seenSupportMessages.has(message.id)) return;
                 seenSupportMessages.add(message.id);
@@ -239,6 +253,8 @@
             }).catch(() => {});
         } catch (_) {
             // Polling retries automatically without exposing conversation data in logs.
+        } finally {
+            supportPolling = false;
         }
     }
 
@@ -296,6 +312,10 @@
         if (isProcessing) return; // Prevent multiple simultaneous requests
         
         const userMessage = text.trim();
+        if (userMessage.length > 1000) {
+            pushAgentMessage('Vui lòng nhập tối đa 1.000 ký tự cho mỗi tin nhắn.', true);
+            return;
+        }
         pushUserMessage(userMessage);
         inputEl.value = '';
         
@@ -337,7 +357,7 @@
             isProcessing = false;
             inputEl.disabled = false;
             sendBtn.disabled = false;
-            inputEl.focus();
+            if (open && !document.hidden) inputEl.focus();
         }
     }
 
@@ -356,7 +376,6 @@
 
     // expose for debugging
     window._beautystoreChatbot = { openBubble, closeBubble };
-    window.addEventListener('beforeunload', () => {
-        if (supportPollTimer) window.clearInterval(supportPollTimer);
-    });
+    document.addEventListener('visibilitychange', resumeSupportPolling);
+    window.addEventListener('pagehide', stopSupportPolling);
 })();

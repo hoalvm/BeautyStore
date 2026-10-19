@@ -1,11 +1,15 @@
 let supportSessionId = null;
 let supportPollTimer = null;
 let supportLoading = false;
+let supportConnecting = false;
+let supportSending = false;
+let supportOpen = false;
 
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('openSupportChat')?.addEventListener('click', openSupportChat);
     document.getElementById('supportChatForm')?.addEventListener('submit', sendSupportMessage);
     document.getElementById('supportChatModal')?.addEventListener('hidden.bs.modal', () => {
+        supportOpen = false;
         window.clearInterval(supportPollTimer);
         supportPollTimer = null;
     });
@@ -39,10 +43,13 @@ function openSupportChat() {
     const modalElement = document.getElementById('supportChatModal');
     if (!modalElement || typeof bootstrap === 'undefined') return;
     bootstrap.Modal.getOrCreateInstance(modalElement).show();
+    supportOpen = true;
     initializeSupportSession();
 }
 
 async function initializeSupportSession() {
+    if (supportConnecting) return;
+    supportConnecting = true;
     renderCustomerSupportPanel('light', 'fa-circle-notch fa-spin', 'Đang kết nối',
         'BeautyStore đang mở phiên hỗ trợ an toàn cho bạn.');
     try {
@@ -51,23 +58,25 @@ async function initializeSupportSession() {
             body: JSON.stringify({})
         });
         supportSessionId = session.sessionId;
+        if (!supportOpen) return;
         await loadSupportMessages(true);
         window.clearInterval(supportPollTimer);
-        supportPollTimer = window.setInterval(() => loadSupportMessages(false), 3000);
+        if (supportOpen) supportPollTimer = window.setInterval(() => loadSupportMessages(false), 3000);
     } catch (error) {
         const authenticated = Boolean(localStorage.getItem('authToken'));
         renderCustomerSupportPanel('danger', 'fa-exclamation-triangle', 'Không thể kết nối',
             error.message, authenticated ? 'Đăng nhập lại' : 'Thử lại',
             authenticated ? () => { window.location.href = '/login'; } : initializeSupportSession);
-    }
+    } finally { supportConnecting = false; }
 }
 
 async function loadSupportMessages(showError = false) {
-    if (!supportSessionId || supportLoading) return;
+    if (!supportSessionId || supportLoading || !supportOpen || document.hidden) return;
     supportLoading = true;
     try {
         const messages = await supportRequest(
             `/api/support/session/${encodeURIComponent(supportSessionId)}/messages`);
+        if (!supportOpen || document.hidden) return;
         const area = document.getElementById('supportMessages');
         if (!area) return;
         const wasNearBottom = area.scrollHeight - area.scrollTop - area.clientHeight < 80;
@@ -122,7 +131,8 @@ async function sendSupportMessage(event) {
     event.preventDefault();
     const input = document.getElementById('supportMessageInput');
     const message = input ? input.value.trim() : '';
-    if (!message || !supportSessionId) return;
+    if (!message || !supportSessionId || supportSending) return;
+    supportSending = true;
     input.disabled = true;
     try {
         await supportRequest(`/api/support/session/${encodeURIComponent(supportSessionId)}/messages`, {
@@ -134,13 +144,14 @@ async function sendSupportMessage(event) {
     } catch (error) {
         window.alert(error.message);
     } finally {
+        supportSending = false;
         input.disabled = false;
-        input.focus();
+        if (supportOpen && !document.hidden) input.focus();
     }
 }
 
 async function markSupportAsRead() {
-    if (!supportSessionId) return;
+    if (!supportSessionId || !supportOpen || document.hidden) return;
     try {
         await supportRequest(`/api/support/session/${encodeURIComponent(supportSessionId)}/read`, {
             method: 'POST'
