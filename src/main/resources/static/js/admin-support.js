@@ -1,10 +1,12 @@
 let currentSessionId = null;
 let currentUserName = '';
 let currentUserEmail = '';
-let messagesLoading = false;
+const loadingMessageSessions = new Set();
+const sessionDrafts = new Map();
+let sendingMessage = false;
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (!localStorage.getItem('authToken')) {
+    if (!(localStorage.getItem('authToken') || localStorage.getItem('token'))) {
         window.location.href = '/login';
         return;
     }
@@ -17,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function getAuthHeaders() {
     return {
-        Authorization: `Bearer ${localStorage.getItem('authToken') || ''}`,
+        Authorization: `Bearer ${localStorage.getItem('authToken') || localStorage.getItem('token') || ''}`,
         'Content-Type': 'application/json'
     };
 }
@@ -136,7 +138,11 @@ function renderAdminSupportPanel(tone, iconClass, title, detail, buttonLabel, bu
 }
 
 function selectSession(sessionId, userName, userEmail) {
+    const input = document.getElementById('messageInput');
+    if (input && currentSessionId) sessionDrafts.set(currentSessionId, input.value);
     currentSessionId = String(sessionId);
+    if (input) input.value = sessionDrafts.get(currentSessionId) || '';
+    document.getElementById('messagesArea')?.replaceChildren();
     currentUserName = cleanText(userName, 'Khách hàng');
     currentUserEmail = cleanText(userEmail);
     const name = document.getElementById('currentUserName');
@@ -156,8 +162,9 @@ function selectSession(sessionId, userName, userEmail) {
 }
 
 async function loadMessages(sessionId, showError = true) {
-    if (messagesLoading || String(sessionId) !== String(currentSessionId)) return;
-    messagesLoading = true;
+    sessionId = String(sessionId);
+    if (loadingMessageSessions.has(sessionId) || sessionId !== currentSessionId) return;
+    loadingMessageSessions.add(sessionId);
     try {
         const messages = await apiRequest(`/api/support/session/${encodeURIComponent(sessionId)}/messages`);
         if (String(sessionId) !== String(currentSessionId)) return;
@@ -176,9 +183,9 @@ async function loadMessages(sessionId, showError = true) {
         if (wasNearBottom) scrollToBottom();
         markAsRead(sessionId);
     } catch (error) {
-        if (showError) window.alert(error.message);
+        if (showError && sessionId === currentSessionId) window.alert(error.message);
     } finally {
-        messagesLoading = false;
+        loadingMessageSessions.delete(sessionId);
     }
 }
 
@@ -209,23 +216,33 @@ function formatTime(value) {
 
 async function sendMessage(event) {
     event.preventDefault();
+    if (sendingMessage) return;
     const input = document.getElementById('messageInput');
     const message = input ? input.value.trim() : '';
     if (!message || !currentSessionId) return;
+    const sessionId = currentSessionId;
+    sendingMessage = true;
     input.disabled = true;
+    const submit = document.querySelector('#messageInputArea button[type="submit"]');
+    if (submit) submit.disabled = true;
     try {
-        await apiRequest(`/api/support/admin/session/${encodeURIComponent(currentSessionId)}/messages`, {
+        await apiRequest(`/api/support/admin/session/${encodeURIComponent(sessionId)}/messages`, {
             method: 'POST',
             body: JSON.stringify({message})
         });
-        input.value = '';
-        await loadMessages(currentSessionId);
+        sessionDrafts.delete(sessionId);
+        if (currentSessionId === sessionId) {
+            input.value = '';
+            await loadMessages(sessionId);
+        }
         loadSessions();
     } catch (error) {
         window.alert(error.message);
     } finally {
+        sendingMessage = false;
+        if (submit) submit.disabled = false;
         input.disabled = false;
-        input.focus();
+        if (currentSessionId === sessionId) input.focus();
     }
 }
 
