@@ -22,13 +22,13 @@
                     <h5 class="mb-0"><i class="fas fa-user me-2"></i>Thông tin người nhận</h5>
                 </div>
                 <div class="card-body">
-                    <form id="checkoutForm">
+                    <form id="checkoutForm" novalidate>
                         <div class="mb-3">
                             <label for="customerName" class="form-label">
                                 <i class="fas fa-user me-1 text-primary"></i>Họ và tên
                                 <span class="text-danger">*</span>
                             </label>
-                            <input type="text" class="form-control" id="customerName" required>
+                            <input type="text" class="form-control" id="customerName" autocomplete="name" maxlength="120" required>
                             <div class="invalid-feedback">Vui lòng nhập họ tên</div>
                         </div>
 
@@ -37,7 +37,7 @@
                                 <i class="fas fa-envelope me-1 text-primary"></i>Email
                                 <span class="text-danger">*</span>
                             </label>
-                            <input type="email" class="form-control" id="customerEmail" required>
+                            <input type="email" class="form-control" id="customerEmail" autocomplete="email" maxlength="255" required>
                             <div class="invalid-feedback">Vui lòng nhập email hợp lệ</div>
                         </div>
 
@@ -46,7 +46,7 @@
                                 <i class="fas fa-phone me-1 text-primary"></i>Số điện thoại
                                 <span class="text-danger">*</span>
                             </label>
-                            <input type="tel" class="form-control" id="customerPhone" pattern="[0-9]{10,11}" required>
+                            <input type="tel" class="form-control" id="customerPhone" autocomplete="tel-national" inputmode="numeric" maxlength="11" pattern="[0-9]{10,11}" required>
                             <div class="invalid-feedback">Vui lòng nhập số điện thoại hợp lệ (10-11 số)</div>
                         </div>
 
@@ -54,22 +54,22 @@
                             <div class="row g-3 mb-3">
                                 <div class="col-md-4">
                                     <label for="shippingProvince" class="form-label">Tỉnh / thành phố <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" id="shippingProvince" autocomplete="address-level1" required>
+                                    <input type="text" class="form-control" id="shippingProvince" autocomplete="address-level1" maxlength="120" required>
                                 </div>
                                 <div class="col-md-4">
                                     <label for="shippingDistrict" class="form-label">Quận / huyện <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" id="shippingDistrict" autocomplete="address-level2" required>
+                                    <input type="text" class="form-control" id="shippingDistrict" autocomplete="address-level2" maxlength="120" required>
                                 </div>
                                 <div class="col-md-4">
                                     <label for="shippingWard" class="form-label">Phường / xã <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" id="shippingWard" autocomplete="address-level3" required>
+                                    <input type="text" class="form-control" id="shippingWard" autocomplete="address-level3" maxlength="120" required>
                                 </div>
                             </div>
                             <label for="shippingAddress" class="form-label">
                                 <i class="fas fa-map-marker-alt me-1 text-primary"></i>Số nhà, tên đường
                                 <span class="text-danger">*</span>
                             </label>
-                            <textarea class="form-control" id="shippingAddress" rows="3" required></textarea>
+                            <textarea class="form-control" id="shippingAddress" rows="3" autocomplete="address-line1" maxlength="255" required></textarea>
                             <div class="invalid-feedback">Vui lòng nhập địa chỉ giao hàng</div>
                         </div>
 
@@ -111,7 +111,7 @@
                             <label for="notes" class="form-label">
                                 <i class="fas fa-comment me-1 text-info"></i>Ghi chú (Tùy chọn)
                             </label>
-                            <textarea class="form-control" id="notes" rows="2" placeholder="Ghi chú thêm về đơn hàng..."></textarea>
+                            <textarea class="form-control" id="notes" rows="2" maxlength="1000" placeholder="Ghi chú thêm về đơn hàng..."></textarea>
                         </div>
                     </form>
                 </div>
@@ -167,7 +167,7 @@
                             </div>
                         </div>
 
-                        <button type="button" class="btn btn-success w-100 btn-lg mb-2" id="placeOrderBtn">
+                        <button type="submit" form="checkoutForm" class="btn btn-success w-100 btn-lg mb-2" id="placeOrderBtn" disabled>
                             <i class="fas fa-check-circle me-2"></i>Đặt hàng ngay
                         </button>
                         <a href="/cart" class="btn btn-outline-secondary w-100">
