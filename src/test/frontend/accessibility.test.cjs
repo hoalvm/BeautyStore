@@ -19,3 +19,12 @@ test('chat layout can shrink within short mobile viewports and respects hidden s
 test('gallery selection styling follows the accessible button state', () => {
     assert.match(read('static/css/style.css'), /button\[aria-current="true"\] > \.product-gallery-thumb/);
 });
+test('chat controls cannot cover modal submit buttons on mobile', () => {
+    const css = read('static/css/chatbot.css');
+    for (const selector of ['chatbot-button', 'chatbot-bubble']) {
+        const rule = css.match(new RegExp(`\\.${selector}\\s*\\{([\\s\\S]*?)\\}`));
+        assert.ok(rule, selector);
+        const layer = Number(rule[1].match(/z-index:\s*(\d+)/)[1]);
+        assert.ok(layer < 1050, `${selector} must stay below the modal backdrop`);
+    }
+});
