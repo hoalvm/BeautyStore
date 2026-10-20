@@ -585,7 +585,7 @@ function filterHistory(status) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         filteredOrders = allHistoryOrders.filter(order => {
-            const orderDate = new Date(order.createdAt);
+            const orderDate = new Date(order.deliveredAt || order.createdAt);
             orderDate.setHours(0, 0, 0, 0);
             return orderDate.getTime() === today.getTime() && (order.status === 'DELIVERED' || order.status === 'FAILED');
         });
@@ -616,9 +616,13 @@ function displayHistory(orders) {
             <td class="text-truncate" style="max-width: 250px;" title="${escapeDeliveryText(order.shippingAddress)}">${escapeDeliveryText(order.shippingAddress)}</td>
             <td><strong>${formatCurrency(order.totalAmount)}</strong></td>
             <td>${getStatusBadge(order.status)}</td>
-            <td>${formatDateTime(order.createdAt)}</td>
+            <td>${formatDateTime(order.deliveredAt || order.createdAt)}
+                <button type="button" class="btn btn-sm btn-outline-primary d-block mt-1"
+                        data-order-action="detail" data-order-id="${safeDeliveryId(order.id)}">Chi tiết / ảnh giao</button>
+            </td>
         </tr>
     `).join('');
+    wireOrderTableActions(tableBody);
 }
 
 // Accept order (PROCESSING -> SHIPPING)
@@ -1022,6 +1026,7 @@ function displayOrderDetail(order) {
     `;
     
     document.getElementById('orderDetailContent').innerHTML = content;
+    window.DeliveryProof?.mount(document.getElementById('orderDetailContent'), order);
 }
 
 

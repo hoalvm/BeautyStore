@@ -421,6 +421,8 @@ function getPaymentCancelReason(responseCode, paymentStatus) {
 }
 
 function displayOrderDetails(order) {
+    window.DeliveryProof?.mount(document.getElementById('orderDeliveryProof'), order,
+        sessionStorage.getItem(`beautystore:order-token:${order.orderNumber}`));
     // Reset status header to success state by default
     const statusIcon = document.getElementById('orderStatusIcon');
     if (statusIcon) {
