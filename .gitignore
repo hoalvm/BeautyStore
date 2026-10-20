@@ -36,3 +36,6 @@ build/
 .env
 .env.*
 !.env.example
+
+# Persistent local demo database and validated local image uploads
+.beautystore/

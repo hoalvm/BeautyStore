@@ -124,6 +124,10 @@ public class Order {
     @Column(name = "delivered_at")
     private LocalDateTime deliveredAt;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "delivery_proof_id", unique = true)
+    private t4m.beauty_store.shipper.entity.DeliveryProof deliveryProof;
+
     @Column(name = "delivery_failure_reason", length = 500)
     private String deliveryFailureReason;
 

@@ -11,6 +11,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import t4m.beauty_store.admin.dto.AccountUpdateRequest;
+import t4m.beauty_store.admin.dto.AccountCreateRequest;
 import t4m.beauty_store.admin.dto.BulkActionRequest;
 import t4m.beauty_store.auth.entity.Role;
 import t4m.beauty_store.auth.entity.User;
@@ -106,6 +107,20 @@ class AdminAccountServiceTests {
     }
 
     @Test
+    void adminCannotAssignUnsupportedLegacyVendorRole() {
+        AccountCreateRequest request = new AccountCreateRequest();
+        request.setEmail("unsupported@example.test");
+        request.setName("Unsupported role");
+        request.setPassword("ValidPassword123!");
+        request.setConfirmPassword("ValidPassword123!");
+        request.setRole("ROLE_VENDOR");
+        assertThatThrownBy(() -> service.createAccount(request))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("vai trò");
+        verifyNoInteractions(roleRepository);
+        verify(userRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void adminCannotBanOwnAuthenticatedAccount() {
         User actor = user(1L, "Admin@BeautyStore.vn", true, "ROLE_ADMIN");
         when(userRepository.findById(1L)).thenReturn(Optional.of(actor));
@@ -116,6 +131,37 @@ class AdminAccountServiceTests {
 
         verify(userRepository, never()).save(actor);
         verify(userRepository, never()).findAdministratorsForUpdate();
+    }
+
+    @Test
+    void banPersistsAdministrativeSuspensionAndUnbanClearsIt() {
+        User customer = user(7L, "customer@example.com", true, "ROLE_USER");
+        when(userRepository.findById(7L)).thenReturn(Optional.of(customer));
+
+        service.banAccount(7L, "operator@example.com");
+        assertThat(customer.isActivated()).isFalse();
+        assertThat(customer.isAccountLocked()).isTrue();
+        assertThat(customer.getAuthVersion()).isEqualTo(1);
+
+        service.unbanAccount(7L);
+        assertThat(customer.isActivated()).isTrue();
+        assertThat(customer.isAccountNonLocked()).isTrue();
+        assertThat(customer.getAuthVersion()).isEqualTo(2);
+    }
+
+    @Test
+    void bulkBanAndUnbanApplySameSuspensionRules() {
+        User customer = user(7L, "customer@example.com", true, "ROLE_USER");
+        when(userRepository.findAllById(Set.of(7L))).thenReturn(List.of(customer));
+
+        service.bulkAction(bulk("ban", 7L), "operator@example.com");
+        assertThat(customer.isActivated()).isFalse();
+        assertThat(customer.isAccountLocked()).isTrue();
+
+        service.bulkAction(bulk("unban", 7L), "operator@example.com");
+        assertThat(customer.isActivated()).isTrue();
+        assertThat(customer.isAccountNonLocked()).isTrue();
+        assertThat(customer.getAuthVersion()).isEqualTo(2);
     }
 
     @Test
@@ -215,6 +261,38 @@ class AdminAccountServiceTests {
         assertThat(target.getEmail()).isEqualTo("staff@beautystore.vn");
         assertThat(target.getRoles()).extracting(Role::getRname).containsExactly("ROLE_USER");
         assertThat(target.getAuthVersion()).isEqualTo(1);
+    }
+
+    @Test
+    void cannotAssignLegacyVendorRoleToNewAccount() {
+        AccountCreateRequest request = new AccountCreateRequest();
+        request.setEmail("vendor@example.test");
+        request.setPassword("Secret@123");
+        request.setConfirmPassword("Secret@123");
+        request.setName("Legacy vendor");
+        request.setRole("ROLE_VENDOR");
+
+        assertThatThrownBy(() -> service.createAccount(request))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("vai trò");
+
+        verifyNoInteractions(roleRepository);
+        verify(userRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void cannotAssignLegacyVendorRoleToExistingAccount() {
+        User target = user(8L, "customer@example.test", true, "ROLE_USER");
+        AccountUpdateRequest request = new AccountUpdateRequest();
+        request.setEmail(target.getEmail());
+        request.setName(target.getName());
+        request.setRole("ROLE_VENDOR");
+        when(userRepository.findById(8L)).thenReturn(Optional.of(target));
+
+        assertThatThrownBy(() -> service.updateAccount(8L, request, "operator@example.test"))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("vai trò");
+
+        verifyNoInteractions(roleRepository);
+        verify(userRepository, never()).save(target);
     }
 
     @Test

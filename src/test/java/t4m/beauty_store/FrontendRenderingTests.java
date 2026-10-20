@@ -59,7 +59,11 @@ class FrontendRenderingTests {
     @WithMockUser(roles = "SHIPPER")
     void shipperPageLoadsItsHandlers() throws Exception {
         mvc.perform(get("/shipper")).andExpect(status().isOk())
-            .andExpect(content().string(containsString("/js/shipper-dashboard.js")));
+            .andExpect(content().string(containsString("/js/shipper-dashboard.js")))
+            .andExpect(content().string(containsString("/images/beauty/favicon.svg")))
+            .andExpect(content().string(containsString("id=\"deliveryProofForm\"")))
+            .andExpect(content().string(containsString("aria-labelledby=\"deliveryProofTitle\"")))
+            .andExpect(content().string(containsString("/js/delivery-proof.js")));
     }
 
     @Test

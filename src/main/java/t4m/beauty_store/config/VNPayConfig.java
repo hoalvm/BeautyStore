@@ -10,7 +10,13 @@ import lombok.Getter;
  */
 @Configuration
 @Getter
-public class VNPayConfig {
+public class VNPayConfig implements org.springframework.context.EnvironmentAware {
+    private org.springframework.core.env.Environment environment;
+
+    @Override
+    public void setEnvironment(org.springframework.core.env.Environment environment) {
+        this.environment = environment;
+    }
     
     // Mã website của merchant trên hệ thống của VNPAY
     @Value("${vnpay.tmn-code:}")
@@ -48,7 +54,8 @@ public class VNPayConfig {
     public static final String LOCALE = "vn";
 
     public boolean isConfigured() {
-        return hasText(tmnCode) && hasText(hashSecret)
+        return (environment == null || !environment.acceptsProfiles(org.springframework.core.env.Profiles.of("demo")))
+                && hasText(tmnCode) && hasText(hashSecret)
                 && !"DEMOV210".equalsIgnoreCase(tmnCode.strip())
                 && !"DEMOSECRETKEY".equalsIgnoreCase(hashSecret.strip());
     }

@@ -52,6 +52,17 @@ class CheckoutServiceTests {
     }
 
     @Test
+    void unavailableVnpayIsRejectedBeforeCheckoutMutatesState() {
+        var unavailable = new IllegalStateException("gateway not configured");
+        doThrow(unavailable).when(vnPayService).requireAvailable();
+
+        assertThatThrownBy(() -> service.checkout(identity, checkoutRequest, httpRequest))
+            .isSameAs(unavailable);
+
+        verifyNoInteractions(orderService, checkoutGuardService, checkoutRateLimiter);
+    }
+
+    @Test
     void vnpayUrlFailurePropagatesFromTheTransactionalCheckoutBoundary() throws Exception {
         LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(15);
         OrderResponse order = vnpayOrder(expiresAt);

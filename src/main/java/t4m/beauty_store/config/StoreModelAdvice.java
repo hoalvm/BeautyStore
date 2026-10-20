@@ -9,6 +9,13 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 @RequiredArgsConstructor
 public class StoreModelAdvice {
     private final StoreProperties storeProperties;
+    private final StoreRuntimeCapabilities capabilities;
+
+    @ModelAttribute("demoMode")
+    public boolean demoMode() { return capabilities.isDemo(); }
+
+    @ModelAttribute("vnpayAvailable")
+    public boolean vnpayAvailable() { return capabilities.isVnpayAvailable(); }
 
     @ModelAttribute("store")
     public StoreProperties store() {

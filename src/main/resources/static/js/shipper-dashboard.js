@@ -58,6 +58,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Initialize dashboard
+    initializeDeliveryProofForm();
     loadDashboardStats();
     loadAvailableOrders();
     
@@ -555,13 +556,7 @@ function updateHistoryStats(orders) {
     const failedCount = orders.filter(o => o.status === 'FAILED').length;
     
     // Count today's deliveries
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayCount = orders.filter(o => {
-        const orderDate = new Date(o.createdAt);
-        orderDate.setHours(0, 0, 0, 0);
-        return orderDate.getTime() === today.getTime() && (o.status === 'DELIVERED' || o.status === 'FAILED');
-    }).length;
+    const todayCount = orders.filter(isDeliveredToday).length;
     
     document.getElementById('historyTotalCount').textContent = totalCount;
     document.getElementById('historyTodayCount').textContent = todayCount;
@@ -580,14 +575,8 @@ function filterHistory(status) {
     } else if (status === 'FAILED') {
         filteredOrders = allHistoryOrders.filter(order => order.status === 'FAILED');
     } else if (status === 'TODAY') {
-        // Filter today's deliveries (both success and failed)
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        filteredOrders = allHistoryOrders.filter(order => {
-            const orderDate = new Date(order.createdAt);
-            orderDate.setHours(0, 0, 0, 0);
-            return orderDate.getTime() === today.getTime() && (order.status === 'DELIVERED' || order.status === 'FAILED');
-        });
+        // Count completed deliveries by actual handover time, not checkout time.
+        filteredOrders = allHistoryOrders.filter(isDeliveredToday);
     }
     // If status === 'ALL', show all orders
     
@@ -596,6 +585,11 @@ function filterHistory(status) {
 }
 
 // Display delivery history
+function isDeliveredToday(order) {
+    if (order.status !== 'DELIVERED' || !order.deliveredAt) return false;
+    return new Date(order.deliveredAt).toDateString() === new Date().toDateString();
+}
+
 function displayHistory(orders) {
     const tableBody = document.getElementById('historyTable');
     
@@ -615,9 +609,13 @@ function displayHistory(orders) {
             <td class="text-truncate" style="max-width: 250px;" title="${escapeDeliveryText(order.shippingAddress)}">${escapeDeliveryText(order.shippingAddress)}</td>
             <td><strong>${formatCurrency(order.totalAmount)}</strong></td>
             <td>${getStatusBadge(order.status)}</td>
-            <td>${formatDateTime(order.createdAt)}</td>
+            <td>${formatDateTime(order.deliveredAt || order.createdAt)}
+                <button type="button" class="btn btn-sm btn-outline-primary d-block mt-1"
+                        data-order-action="detail" data-order-id="${safeDeliveryId(order.id)}">Chi tiết / ảnh giao</button>
+            </td>
         </tr>
     `).join('');
+    wireOrderTableActions(tableBody);
 }
 
 // Accept order (PROCESSING -> SHIPPING)
@@ -657,39 +655,131 @@ async function acceptOrder(orderId) {
     }
 }
 
-// Complete order (SHIPPING -> DELIVERED)
-async function completeOrder(orderId) {
-    if (!safeDeliveryId(orderId) || pendingDeliveryUpdates.has(orderId)) return;
-    if (!confirm('Xác nhận đã giao hàng thành công?')) {
+const deliveryProofState = {orderId: null, busy: false, previewUrl: null, returnFocus: null};
+
+function deliveryPhotoError(file) {
+    if (!file || file.size === 0) return 'Vui lòng chụp hoặc chọn ảnh giao hàng.';
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        return 'Chỉ hỗ trợ JPEG, PNG hoặc WebP. Vui lòng đổi ảnh HEIC sang JPEG.';
+    }
+    if (file.size > 5 * 1024 * 1024) return 'Ảnh giao hàng không được vượt quá 5 MB.';
+    return '';
+}
+
+function releaseDeliveryPreview() {
+    const preview = document.getElementById('deliveryProofPreview');
+    preview.hidden = true;
+    preview.removeAttribute('src');
+    if (deliveryProofState.previewUrl) URL.revokeObjectURL(deliveryProofState.previewUrl);
+    deliveryProofState.previewUrl = null;
+}
+
+function previewDeliveryPhoto() {
+    releaseDeliveryPreview();
+    const input = document.getElementById('deliveryProofFile');
+    const error = deliveryPhotoError(input.files[0]);
+    document.getElementById('deliveryProofStatus').textContent = error || 'Ảnh đã sẵn sàng. Kiểm tra trước khi xác nhận.';
+    input.setCustomValidity(error);
+    input.setAttribute('aria-invalid', String(Boolean(error)));
+    if (error) return;
+    const preview = document.getElementById('deliveryProofPreview');
+    deliveryProofState.previewUrl = URL.createObjectURL(input.files[0]);
+    preview.src = deliveryProofState.previewUrl;
+    preview.hidden = false;
+}
+
+function initializeDeliveryProofForm() {
+    const modal = document.getElementById('deliveryProofModal');
+    document.getElementById('deliveryProofForm').addEventListener('submit', submitDeliveryProof);
+    document.getElementById('deliveryProofFile').addEventListener('change', previewDeliveryPhoto);
+    document.getElementById('deliveryProofPreview').addEventListener('error', () => {
+        if (!deliveryProofState.previewUrl) return;
+        releaseDeliveryPreview();
+        const error = 'Không đọc được ảnh. Vui lòng chọn ảnh khác.';
+        document.getElementById('deliveryProofStatus').textContent = error;
+        document.getElementById('deliveryProofFile').setCustomValidity(error);
+    });
+    window.addEventListener('pagehide', releaseDeliveryPreview);
+    modal.addEventListener('hide.bs.modal', event => {
+        if (deliveryProofState.busy) event.preventDefault();
+    });
+    modal.addEventListener('hidden.bs.modal', () => {
+        deliveryProofState.orderId = null;
+        releaseDeliveryPreview();
+        document.getElementById('deliveryProofForm').reset();
+        document.getElementById('deliveryProofFile').setCustomValidity('');
+        document.getElementById('deliveryProofFile').removeAttribute('aria-invalid');
+        document.getElementById('deliveryProofStatus').textContent = '';
+        const focusTarget = deliveryProofState.returnFocus;
+        if (focusTarget?.isConnected) focusTarget.focus();
+        else document.querySelector('[data-shipper-tab="active"]')?.focus();
+    });
+    modal.addEventListener('shown.bs.modal', () => document.getElementById('deliveryProofFile').focus());
+}
+
+function completeOrder(orderId) {
+    if (!safeDeliveryId(orderId) || pendingDeliveryUpdates.has(orderId) || deliveryProofState.busy) return;
+    deliveryProofState.orderId = orderId;
+    deliveryProofState.returnFocus = document.activeElement;
+    releaseDeliveryPreview();
+    document.getElementById('deliveryProofForm').reset();
+    document.getElementById('deliveryProofFile').setCustomValidity('');
+    document.getElementById('deliveryProofFile').removeAttribute('aria-invalid');
+    document.getElementById('deliveryProofStatus').textContent = '';
+    document.getElementById('deliveryProofOrder').textContent = `Đơn hàng #${orderId}`;
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('deliveryProofModal')).show();
+}
+
+async function submitDeliveryProof(event) {
+    event.preventDefault();
+    const orderId = deliveryProofState.orderId;
+    if (!orderId || deliveryProofState.busy || pendingDeliveryUpdates.has(orderId)) return;
+    const form = document.getElementById('deliveryProofForm');
+    const image = document.getElementById('deliveryProofFile').files[0];
+    const status = document.getElementById('deliveryProofStatus');
+    const validationError = deliveryPhotoError(image);
+    if (validationError) {
+        status.textContent = validationError;
+        document.getElementById('deliveryProofFile').focus();
         return;
     }
-    
+    if (!form.reportValidity()) return;
     const token = localStorage.getItem('authToken') || localStorage.getItem('token');
-    if (!token) return;
-
+    if (!token) {
+        status.textContent = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+        return;
+    }
+    const body = new FormData();
+    body.append('image', image);
+    deliveryProofState.busy = true;
+    form.setAttribute('aria-busy', 'true');
+    form.querySelectorAll('button, input').forEach(control => { control.disabled = true; });
+    status.textContent = 'Đang gửi ảnh và xác nhận giao hàng…';
     setDeliveryBusy(orderId, true);
+    let completed = false;
     try {
         const response = await fetch(`/api/shipper/orders/${orderId}/complete`, {
             method: 'PUT',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-            }
+            headers: {'Authorization': `Bearer ${token}`},
+            body
         });
-
         if (response.ok) {
-            showToast('Đã hoàn thành giao hàng!', 'success');
-            // Refresh data
+            completed = true;
+            showToast('Đã lưu ảnh và hoàn thành giao hàng!', 'success');
             loadDashboardStats();
             loadActiveOrders();
         } else {
-            const error = await response.json();
-            showToast(error.message || error.error || 'Không thể hoàn thành đơn hàng', 'danger');
+            const error = await response.json().catch(() => ({}));
+            status.textContent = error.message || 'Không thể hoàn thành đơn hàng. Vui lòng thử lại.';
         }
-    } catch (error) {
-        console.error('Error completing order:', error);
-        showToast('Lỗi kết nối', 'danger');
+    } catch (_) {
+        status.textContent = 'Mất kết nối. Ảnh đã chọn được giữ lại; bạn có thể gửi lại an toàn.';
     } finally {
+        deliveryProofState.busy = false;
+        form.setAttribute('aria-busy', 'false');
+        form.querySelectorAll('button, input').forEach(control => { control.disabled = false; });
         setDeliveryBusy(orderId, false);
+        if (completed) bootstrap.Modal.getOrCreateInstance(document.getElementById('deliveryProofModal')).hide();
     }
 }
 
@@ -929,6 +1019,7 @@ function displayOrderDetail(order) {
     `;
     
     document.getElementById('orderDetailContent').innerHTML = content;
+    window.DeliveryProof?.mount(document.getElementById('orderDetailContent'), order);
 }
 
 

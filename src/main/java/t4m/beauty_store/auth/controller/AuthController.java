@@ -49,7 +49,7 @@ public class AuthController {
         try {
             otpService.checkClientRequestLimit(request.getRemoteAddr());
             userService.register(dto);
-            return ResponseEntity.ok(new AuthResponse(dto.getEmail(), dto.getRole(), "Registration successful, please check your email for OTP"));
+            return ResponseEntity.ok(new AuthResponse(dto.getEmail(), "ROLE_USER", "Registration successful, please check your email for OTP"));
         } catch (EmailAlreadyExistsException | InvalidRoleException e) {
             logger.warn("Registration request rejected");
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
@@ -205,10 +205,6 @@ public class AuthController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage(), e);
         } catch (IllegalArgumentException e) {
             throw e;
-        } catch (Exception e) {
-            logger.error("Password change request failed");
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-                    "Không thể đổi mật khẩu", e);
         }
     }
 

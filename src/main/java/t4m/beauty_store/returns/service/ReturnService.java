@@ -162,6 +162,11 @@ public class ReturnService {
             .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy yêu cầu đổi trả"));
         ReturnStatus previous = request.getStatus();
         validateTransition(previous, status, refundReference);
+        if (status == ReturnStatus.REJECTED && request.getItems().stream()
+                .anyMatch(item -> Boolean.TRUE.equals(item.getRestocked()))) {
+            throw new IllegalArgumentException(
+                "Không thể từ chối yêu cầu đã nhập lại kho; hãy hoàn tất ghi nhận hoàn tiền");
+        }
         request.setStatus(status);
         request.setAdminNote(clean(note));
         if (status == ReturnStatus.REFUNDED) {

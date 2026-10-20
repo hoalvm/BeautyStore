@@ -22,8 +22,6 @@ import t4m.beauty_store.review.entity.ReviewImage;
 import t4m.beauty_store.review.entity.ReviewStatus;
 import t4m.beauty_store.review.repository.ReviewRepository;
 
-import java.net.URI;
-import java.util.LinkedHashSet;
 import java.util.List;
 
 @Service
@@ -99,20 +97,25 @@ public class ReviewService {
         return reviews.map(ReviewResponse::fromEntity);
     }
 
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public ReviewResponse moderate(Long reviewId, ReviewStatus status) {
         if (status == null) throw new IllegalArgumentException("Trạng thái đánh giá là bắt buộc");
+        Long productId = reviewRepository.findProductIdById(reviewId)
+            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đánh giá"));
+        // Serialize moderators per product, before changing any review. READ_COMMITTED
+        // ensures the aggregate sees the preceding moderator's commit after waiting.
+        Product product = productRepository.findByIdForUpdate(productId)
+            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy sản phẩm"));
         Review review = reviewRepository.findById(reviewId)
             .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đánh giá"));
         review.setStatus(status);
-        Review saved = reviewRepository.save(review);
-        refreshProductRating(review.getProduct().getId());
+        Review saved = reviewRepository.saveAndFlush(review);
+        refreshProductRating(product);
         return ReviewResponse.fromEntity(saved);
     }
 
-    private void refreshProductRating(Long productId) {
-        Product product = productRepository.findById(productId)
-            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy sản phẩm"));
+    private void refreshProductRating(Product product) {
+        Long productId = product.getId();
         Double average = reviewRepository.averageApprovedStars(productId);
         long count = reviewRepository.countByProductIdAndStatus(productId, ReviewStatus.APPROVED);
         product.setAverageRating(average == null ? 0.0 : average);
@@ -124,24 +127,4 @@ public class ReviewService {
         return value == null ? null : value.trim();
     }
 
-    private static List<String> validHttpsUrls(List<String> values) {
-        if (values == null || values.isEmpty()) return List.of();
-        LinkedHashSet<String> result = new LinkedHashSet<>();
-        for (String value : values) {
-            if (value == null || value.isBlank()) continue;
-            String normalized = value.trim();
-            try {
-                URI uri = URI.create(normalized);
-                if (!"https".equalsIgnoreCase(uri.getScheme())
-                        || uri.getHost() == null || uri.getUserInfo() != null) {
-                    throw new IllegalArgumentException("URL ảnh đánh giá không hợp lệ");
-                }
-            } catch (RuntimeException exception) {
-                throw new IllegalArgumentException("URL ảnh đánh giá không hợp lệ");
-            }
-            result.add(normalized);
-        }
-        if (result.size() > 5) throw new IllegalArgumentException("Mỗi đánh giá có tối đa 5 ảnh");
-        return List.copyOf(result);
-    }
 }

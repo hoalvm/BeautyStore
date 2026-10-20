@@ -542,8 +542,11 @@ function showErrorModal(message) {
 let currentReviewOrderItemId = null;
 let selectedStars = 0;
 let reviewSubmitting = false;
+const uploadedReviewFiles = new Map();
 
 function openReviewModal(orderItemId, productName) {
+    if (reviewSubmitting) return;
+    uploadedReviewFiles.clear();
     currentReviewOrderItemId = safePositiveInteger(orderItemId);
     selectedStars = 0;
     
@@ -637,26 +640,8 @@ async function submitReview() {
     
     try {
         const files = Array.from(document.getElementById('reviewImages').files || []);
-        if (files.length > 5) throw new Error('Mỗi đánh giá có tối đa 5 ảnh.');
-        if (files.some(file => !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024)) {
-            throw new Error('Ảnh phải là JPEG, PNG hoặc WebP và không quá 10 MB.');
-        }
-        const imageUrls = [];
-        for (const file of files) {
-            const formData = new FormData();
-            formData.append('orderItemId', String(currentReviewOrderItemId));
-            formData.append('image', file);
-            const upload = await fetch('/api/uploads/review', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` },
-                body: formData
-            });
-            const uploaded = await upload.json().catch(() => ({}));
-            if (!upload.ok || !uploaded.url) {
-                throw new Error(uploaded.message || 'Không thể tải ảnh đánh giá.');
-            }
-            imageUrls.push(uploaded.url);
-        }
+        const imageUrls = await BeautyUI.uploadEvidence(files, 'review', currentReviewOrderItemId,
+            { Authorization: `Bearer ${token}` }, uploadedReviewFiles);
 
         const response = await fetch('/api/reviews', {
             method: 'POST',

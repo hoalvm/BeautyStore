@@ -9,6 +9,11 @@ import t4m.beauty_store.auth.entity.User;
 import t4m.beauty_store.auth.exception.UserNotFoundException;
 import t4m.beauty_store.auth.repository.UserRepository;
 import t4m.beauty_store.config.StoreTime;
+import t4m.beauty_store.config.ApiException;
+import t4m.beauty_store.shipper.entity.DeliveryProof;
+import t4m.beauty_store.shipper.repository.DeliveryProofRepository;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
 import t4m.beauty_store.order.entity.Order;
 import t4m.beauty_store.order.entity.OrderStatus;
 import t4m.beauty_store.order.repository.OrderRepository;
@@ -24,6 +29,8 @@ public class ShipperService {
     
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
+    private final DeliveryProofRepository proofRepository;
+    private final DeliveryProofImageProcessor imageProcessor;
 
     /**
      * Lấy danh sách đơn hàng có trạng thái PROCESSING (chờ shipper nhận)
@@ -122,27 +129,31 @@ public class ShipperService {
      * Shipper hoàn thành giao hàng
      * Chuyển trạng thái từ SHIPPING -> DELIVERED
      */
-    @Transactional
-    public Order completeDelivery(Long orderId, String shipperEmail) {
+    @Transactional(rollbackFor = Exception.class)
+    public Order completeDelivery(Long orderId, String shipperEmail, MultipartFile image) throws IOException {
         User shipper = userRepository.findByEmail(shipperEmail)
                 .orElseThrow(() -> new UserNotFoundException("Shipper not found"));
         
         Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng"));
         
-        // Kiểm tra trạng thái đơn hàng
-        if (order.getStatus() != OrderStatus.SHIPPING) {
-            throw new IllegalArgumentException("Chỉ có thể hoàn thành đơn hàng đang ở trạng thái 'Đang giao'");
-        }
-        
-        // Kiểm tra đơn hàng có thuộc về shipper này không
         if (order.getShipper() == null || !order.getShipper().getId().equals(shipper.getId())) {
-            throw new IllegalArgumentException("Bạn không có quyền hoàn thành đơn hàng này");
+            throw ApiException.forbidden("Bạn không có quyền hoàn thành đơn hàng này");
         }
-        
-        // Cập nhật trạng thái
+        // A lost HTTP response can be retried without replacing evidence or the delivery time.
+        if (order.getStatus() == OrderStatus.DELIVERED && order.getDeliveryProof() != null) {
+            return initializeForResponse(order);
+        }
+        if (order.getStatus() != OrderStatus.SHIPPING) {
+            throw ApiException.conflict("Chỉ có thể hoàn thành đơn hàng đang giao");
+        }
+        byte[] normalizedImage = imageProcessor.prepare(image);
+        // Match DATETIME(6) precision so the first response and an idempotent retry agree.
+        var completedAt = StoreTime.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        order.setDeliveryProof(proofRepository.save(DeliveryProof.builder()
+            .uploadedBy(shipper.getId()).uploadedAt(completedAt).imageBytes(normalizedImage).build()));
         order.setStatus(OrderStatus.DELIVERED);
-        order.setDeliveredAt(StoreTime.now());
+        order.setDeliveredAt(completedAt);
         if ("COD".equalsIgnoreCase(order.getPaymentMethod())) {
             order.setPaymentStatus("COD_PAID");
         }

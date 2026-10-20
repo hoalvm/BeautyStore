@@ -33,4 +33,15 @@ class ApiExceptionHandlerTests {
         assertThat(response.getBody().getCode()).isEqualTo("INTERNAL_ERROR");
         assertThat(response.getBody().getMessage()).doesNotContain("secret");
     }
+
+    @Test
+    void staleConcurrentWriteIsARecoverableConflictWithoutInternalDetails() {
+        var response = handler.staleUpdate(
+            new org.springframework.dao.OptimisticLockingFailureException("database details"),
+            new MockHttpServletRequest());
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody().getCode()).isEqualTo("STALE_UPDATE");
+        assertThat(response.getBody().getMessage()).doesNotContain("database details");
+    }
 }

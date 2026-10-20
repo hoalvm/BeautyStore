@@ -567,6 +567,7 @@ function displayOrderDetail(order) {
         </div>
         ` : ''}
     `;
+    window.DeliveryProof?.mount(content, order);
 }
 
 function getStatusText(status) {

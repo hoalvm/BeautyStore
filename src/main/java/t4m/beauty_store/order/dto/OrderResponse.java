@@ -50,6 +50,8 @@ public class OrderResponse {
     private String vnpayResponseCode;
     private String deliveryFailureReason;
     private Boolean inventoryCommitted;
+    private boolean hasDeliveryProof;
+    private LocalDateTime deliveredAt;
 
     public static OrderResponse fromEntity(Order order) {
         List<OrderItemResponse> items = order.getOrderItems().stream()
@@ -101,6 +103,8 @@ public class OrderResponse {
                 .vnpayResponseCode(order.getVnpayResponseCode())
                 .deliveryFailureReason(order.getDeliveryFailureReason())
                 .inventoryCommitted(order.getInventoryCommitted())
+                .hasDeliveryProof(order.getDeliveryProof() != null)
+                .deliveredAt(order.getDeliveredAt())
                 .build();
     }
 }

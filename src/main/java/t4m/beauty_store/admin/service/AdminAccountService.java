@@ -37,6 +37,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AdminAccountService {
     private static final Logger logger = LoggerFactory.getLogger(AdminAccountService.class);
+    private static final Set<String> ASSIGNABLE_ROLES = Set.of("ROLE_USER", "ROLE_SHIPPER", "ROLE_ADMIN");
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
@@ -109,8 +110,7 @@ public class AdminAccountService {
         user.setUpdated(storeTime.currentDateTime());
 
         // Assign role
-        Role role = roleRepository.findByRname(request.getRole())
-            .orElseThrow(() -> new IllegalArgumentException("Vai trò không hợp lệ: " + request.getRole()));
+        Role role = assignableRole(request.getRole());
         user.setRoles(new HashSet<>(Collections.singletonList(role)));
 
         User savedUser = userRepository.save(user);
@@ -158,8 +158,7 @@ public class AdminAccountService {
 
         // Update role if provided
         if (request.getRole() != null && !request.getRole().isEmpty()) {
-            Role role = roleRepository.findByRname(request.getRole())
-                .orElseThrow(() -> new IllegalArgumentException("Vai trò không hợp lệ: " + request.getRole()));
+            Role role = assignableRole(request.getRole());
             boolean roleChanged = user.getRoles().size() != 1 || user.getRoles().stream()
                 .noneMatch(current -> current.getRname().equals(role.getRname()));
             user.setRoles(new HashSet<>(Collections.singletonList(role)));
@@ -248,6 +247,7 @@ public class AdminAccountService {
         }
 
         user.setActivated(false);
+        user.setAccountLocked(true);
         user.setAuthVersion(user.getAuthVersion() + 1);
         user.setUpdated(storeTime.currentDateTime());
         userRepository.save(user);
@@ -263,6 +263,7 @@ public class AdminAccountService {
             .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy tài khoản với ID: " + id));
 
         user.setActivated(true);
+        user.setAccountLocked(false);
         user.setAuthVersion(user.getAuthVersion() + 1);
         user.setUpdated(storeTime.currentDateTime());
         userRepository.save(user);
@@ -307,6 +308,7 @@ public class AdminAccountService {
                 requireAnotherActiveAdmin(activeAdminIds(users));
                 users.forEach(user -> {
                     user.setActivated(false);
+                    user.setAccountLocked(true);
                     user.setAuthVersion(user.getAuthVersion() + 1);
                     user.setUpdated(storeTime.currentDateTime());
                 });
@@ -317,6 +319,7 @@ public class AdminAccountService {
             case "unban":
                 users.forEach(user -> {
                     user.setActivated(true);
+                    user.setAccountLocked(false);
                     user.setAuthVersion(user.getAuthVersion() + 1);
                     user.setUpdated(storeTime.currentDateTime());
                 });
@@ -386,6 +389,14 @@ public class AdminAccountService {
 
     private static String normalizeEmail(String value) {
         return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private Role assignableRole(String name) {
+        if (name == null || !ASSIGNABLE_ROLES.contains(name)) {
+            throw new IllegalArgumentException("Chỉ hỗ trợ vai trò khách hàng, giao hàng hoặc quản trị");
+        }
+        return roleRepository.findByRname(name)
+            .orElseThrow(() -> new IllegalArgumentException("Vai trò không hợp lệ: " + name));
     }
 
     private static String normalizeStatus(String value) {

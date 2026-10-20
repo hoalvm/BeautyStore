@@ -19,13 +19,17 @@
     <meta property="og:url" th:if="${canonicalUrl != null}" th:content="${canonicalUrl}">
     <link rel="canonical" th:if="${canonicalUrl != null}" th:href="${canonicalUrl}">
     <meta name="ctx" th:content="@{/}">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="/vendor/bootstrap-5.3.0/bootstrap.min.css" rel="stylesheet">
+    <link href="/vendor/fontawesome-6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/style.css}">
     <script th:src="@{/js/beauty-ui.js}" defer></script>
 </head>
 
 <header th:fragment="header" class="header-section">
+    <div th:if="${demoMode}" class="alert alert-warning rounded-0 mb-0 text-center" role="note">
+        Demo cục bộ · Dữ liệu minh họa · Chỉ thanh toán COD ·
+        <a href="/demo/inbox" target="_blank" rel="noopener">Hộp thư OTP &amp; tài khoản demo</a>
+    </div>
     <a class="skip-link" href="#main-content">Chuyển đến nội dung chính</a>
     <div class="top-bar text-white py-2">
         <div class="container d-flex flex-wrap justify-content-between gap-2">
@@ -136,5 +140,5 @@
     </script>
 </header>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/vendor/bootstrap-5.3.0/bootstrap.bundle.min.js"></script>
 </html>

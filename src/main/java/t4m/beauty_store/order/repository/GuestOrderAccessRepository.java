@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 import t4m.beauty_store.order.entity.GuestOrderAccess;
 import jakarta.persistence.LockModeType;
 
@@ -24,7 +25,7 @@ public interface GuestOrderAccessRepository extends JpaRepository<GuestOrderAcce
         String orderNumber, String accessTokenHash);
 
     @Modifying
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @Query("delete from GuestOrderAccess access where access.id = :id and access.verifiedAt is null")
     int deleteUnverifiedById(@Param("id") Long id);
 }

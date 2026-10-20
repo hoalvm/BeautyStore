@@ -66,7 +66,7 @@ class JwtRequestFilterTests {
                 .build();
         when(jwtUtil.extractUsername("signed-token")).thenReturn("customer@example.com");
         when(userDetailsService.loadUserByUsername("customer@example.com")).thenReturn(user);
-        when(jwtUtil.isTokenValid("signed-token", "customer@example.com", 0)).thenReturn(true);
+        when(jwtUtil.isTokenValid("signed-token", "customer@example.com", 0, null)).thenReturn(true);
 
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/auth/profile");
         request.addHeader("Authorization", "Bearer signed-token");
@@ -89,7 +89,7 @@ class JwtRequestFilterTests {
                 .build();
         when(jwtUtil.extractUsername("page-token")).thenReturn("admin@example.com");
         when(userDetailsService.loadUserByUsername("admin@example.com")).thenReturn(admin);
-        when(jwtUtil.isTokenValid("page-token", "admin@example.com", 0)).thenReturn(true);
+        when(jwtUtil.isTokenValid("page-token", "admin@example.com", 0, null)).thenReturn(true);
 
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/admin");
         request.setCookies(new Cookie(AuthCookieService.COOKIE_NAME, "page-token"));
@@ -113,7 +113,7 @@ class JwtRequestFilterTests {
         when(jwtUtil.extractUsername("still-signed-token")).thenReturn("disabled@example.com");
         when(userDetailsService.loadUserByUsername("disabled@example.com"))
                 .thenReturn(disabledUser);
-        when(jwtUtil.isTokenValid("still-signed-token", "disabled@example.com", 0))
+        when(jwtUtil.isTokenValid("still-signed-token", "disabled@example.com", 0, null))
                 .thenReturn(true);
 
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/orders");
@@ -140,5 +140,48 @@ class JwtRequestFilterTests {
 
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
         verify(chain).doFilter(request, response);
+    }
+
+    @Test
+    void passesPersistedAccountIdToTokenValidation() throws Exception {
+        t4m.beauty_store.auth.entity.User user = new t4m.beauty_store.auth.entity.User();
+        user.setId(7L);
+        user.setEmail("customer@example.com");
+        user.setActivated(true);
+        when(jwtUtil.extractUsername("bound-token")).thenReturn(user.getEmail());
+        when(userDetailsService.loadUserByUsername(user.getEmail())).thenReturn(user);
+        when(jwtUtil.isTokenValid("bound-token", user.getEmail(), 0, 7L)).thenReturn(true);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/auth/profile");
+        request.addHeader("Authorization", "Bearer bound-token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        verify(jwtUtil).isTokenValid("bound-token", user.getEmail(), 0, 7L);
+        assertThat(SecurityContextHolder.getContext().getAuthentication().getName())
+            .isEqualTo(user.getEmail());
+        verify(chain).doFilter(request, response);
+    }
+
+    @Test
+    void administrativeSuspensionRejectsAnOtherwiseValidBoundToken() throws Exception {
+        t4m.beauty_store.auth.entity.User user = new t4m.beauty_store.auth.entity.User();
+        user.setId(7L);
+        user.setEmail("customer@example.com");
+        user.setActivated(true);
+        user.setAccountLocked(true);
+        when(jwtUtil.extractUsername("bound-token")).thenReturn(user.getEmail());
+        when(userDetailsService.loadUserByUsername(user.getEmail())).thenReturn(user);
+        when(jwtUtil.isTokenValid("bound-token", user.getEmail(), 0, 7L)).thenReturn(true);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/auth/profile");
+        request.addHeader("Authorization", "Bearer bound-token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(401);
+        verify(chain, never()).doFilter(request, response);
     }
 }

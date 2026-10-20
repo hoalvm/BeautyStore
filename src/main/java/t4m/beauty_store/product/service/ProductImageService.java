@@ -32,7 +32,7 @@ public class ProductImageService {
 
     @Transactional
     public ProductImage create(Long productId, ProductImageRequest request) {
-        Product product = requireProduct(productId);
+        Product product = lockProduct(productId);
         ProductVariant variant = resolveVariant(productId, request.getVariantId());
         enforceLimit(productId, variant, null);
         ProductImage image = ProductImage.builder()
@@ -51,10 +51,9 @@ public class ProductImageService {
     }
 
     @Transactional
-    public ProductImage update(Long id, ProductImageRequest request) {
-        ProductImage image = imageRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Product image not found"));
-        Long productId = image.getProduct().getId();
+    public ProductImage update(Long productId, Long id, ProductImageRequest request) {
+        lockProduct(productId);
+        ProductImage image = requireOwnedImage(productId, id);
         ProductVariant variant = resolveVariant(productId, request.getVariantId());
         enforceLimit(productId, variant, id);
         if (Boolean.TRUE.equals(request.getPrimary())) clearPrimary(productId, variant, id);
@@ -71,21 +70,21 @@ public class ProductImageService {
     }
 
     @Transactional
-    public ProductImage setPrimary(Long id) {
-        ProductImage image = imageRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Product image not found"));
-        clearPrimary(image.getProduct().getId(), image.getVariant(), id);
+    public ProductImage setPrimary(Long productId, Long id) {
+        lockProduct(productId);
+        ProductImage image = requireOwnedImage(productId, id);
+        clearPrimary(productId, image.getVariant(), id);
         image.setPrimary(true);
         return imageRepository.save(image);
     }
 
     @Transactional
-    public ProductImage delete(Long id) {
-        ProductImage image = imageRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Product image not found"));
-        Product product = image.getProduct();
+    public ProductImage delete(Long productId, Long id) {
+        Product product = lockProduct(productId);
+        ProductImage image = requireOwnedImage(productId, id);
         ProductVariant variant = image.getVariant();
         boolean wasPrimary = Boolean.TRUE.equals(image.getPrimary());
+        product.getImages().remove(image);
         imageRepository.delete(image);
         imageRepository.flush();
         if (wasPrimary) {
@@ -142,5 +141,20 @@ public class ProductImageService {
     private Product requireProduct(Long id) {
         return productRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("Product not found"));
+    }
+
+    private Product lockProduct(Long id) {
+        // Acquire before reading any images: all gallery writers share one
+        // lock, including requests moving an image between variant scopes.
+        return productRepository.findByIdForUpdate(id)
+            .orElseThrow(() -> new IllegalArgumentException("Product not found"));
+    }
+
+    private ProductImage requireOwnedImage(Long productId, Long imageId) {
+        ProductImage image = getImage(imageId);
+        if (!productId.equals(image.getProduct().getId())) {
+            throw new IllegalArgumentException("Product image does not belong to product");
+        }
+        return image;
     }
 }

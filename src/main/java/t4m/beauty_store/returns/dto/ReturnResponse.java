@@ -75,7 +75,7 @@ public class ReturnResponse {
                 .reason(item.getReason().name())
                 .unopenedAndSealed(item.getUnopenedAndSealed())
                 .details(item.getDetails())
-                .imageUrls(item.getImageUrls())
+                .imageUrls(List.copyOf(item.getImageUrls()))
                 .restocked(item.getRestocked())
                 .restockedAt(item.getRestockedAt())
                 .batchRestocks(item.getBatchRestocks().stream().map(restock -> BatchRestock.builder()

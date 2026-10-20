@@ -44,3 +44,15 @@ test('unscoped token from a different guest order is not reused', async () => {
     const {context,storage} = load(); storage.set('guestOrderToken','other-order-token');
     assert.equal((await context.fetchOrder('NEW-ORDER')).status,401);
 });
+test('payment status uses scoped guest access when logged-in ownership returns legacy 400',async()=>{
+    const {context,storage}=load();
+    context.localStorage.getItem=()=> 'member-token';
+    storage.set('beautystore:order-token:GUEST-ORDER','matching-guest-token');
+    const calls=[];
+    context.fetch=async(url,options)=>{
+        calls.push({url,headers:options.headers});
+        return {status:url.startsWith('/api/orders/')?400:200};
+    };
+    assert.equal((await context.fetchOrder('GUEST-ORDER')).status,200);
+    assert.equal(calls[1].headers['X-Order-Token'],'matching-guest-token');
+});

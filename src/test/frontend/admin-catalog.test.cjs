@@ -37,6 +37,49 @@ test('stock filtering within a search page never hides later server pages', () =
     assert.equal(page.totalElements, 85);
 });
 
+test('older catalog responses never overwrite a newer search or pagination', async () => {
+    const pending = [];
+    const {context, run} = load('admin-products.js', {fetch: () => new Promise(resolve => pending.push(resolve))});
+    const renders = [];
+    context.showTableMessage = () => {};
+    context.renderProducts = products => renders.push(products[0]?.id);
+    context.updatePagination = () => {};
+    const first = context.loadProducts();
+    run("currentSearch = 'new'");
+    const second = context.loadProducts();
+    pending[1]({ok: true, json: async () => ({content: [{id: 2}], totalElements: 1, totalPages: 1})});
+    await second;
+    pending[0]({ok: true, json: async () => ({content: [{id: 1}], totalElements: 1, totalPages: 1})});
+    await first;
+    assert.deepEqual(renders, [2]);
+});
+
+test('product editor ignores an older product response after selecting another product', async () => {
+    const pending = [];
+    const {context, run} = load('admin-products.js', {
+        fetch: () => new Promise(resolve => pending.push(resolve)),
+        bootstrap: {Modal: {getOrCreateInstance: () => ({show() {}})}}
+    });
+    const edited = [];
+    context.fillProductForm = product => edited.push(product.id);
+    context.loadVariants = async () => {};
+    context.loadGallery = async () => {};
+    const first = context.editProduct(1);
+    const second = context.editProduct(2);
+    pending[1]({ok: true, json: async () => ({id: 2})}); await second;
+    pending[0]({ok: true, json: async () => ({id: 1})}); await first;
+    assert.deepEqual(edited, [2]);
+    assert.equal(run('editingProduct.id'), 2);
+});
+
+test('catalog table displays a valid zero sale price instead of original price', () => {
+    const {context} = load('admin-products.js');
+    const row = context.createProductRow({name: 'Demo', variants: [{price: 50000, discountPrice: 0}]});
+    const price = row.children[4];
+    assert.equal(price.children[0].textContent, context.formatPrice(0));
+    assert.equal(price.children[1].textContent, context.formatPrice(50000));
+});
+
 test('voucher scope includes archived catalog entries', async () => {
     const requests = [];
     const {context} = load('admin-voucher-form.js', {fetch: async url => {

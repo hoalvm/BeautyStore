@@ -1,6 +1,12 @@
 package t4m.beauty_store.chatbot.service;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.core.env.Environment;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.mock.env.MockEnvironment;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.RestTemplate;
 import t4m.beauty_store.config.StoreProperties;
 import t4m.beauty_store.config.StoreTime;
 import t4m.beauty_store.product.repository.CategoryRepository;
@@ -23,7 +29,7 @@ class ChatbotServiceSafetyTests {
             new IntentRecognitionService(),
             new InteractionLoggingService(new StoreTime(
                 Clock.fixed(Instant.parse("2026-06-15T03:00:00Z"), StoreTime.ZONE))),
-            new StoreProperties());
+            new StoreProperties(), mock(PlatformTransactionManager.class), mock(Environment.class));
 
     @Test
     void handlesPossibleCosmeticReactionWithoutCallingCatalogOrAi() {
@@ -41,5 +47,30 @@ class ChatbotServiceSafetyTests {
 
         assertThat(response).contains("không nên gửi").contains("số thẻ");
         verifyNoInteractions(productRepository, categoryRepository);
+    }
+
+    @Test
+    void humanHandoffExplainsTheExplicitButtonInsteadOfPretendingToOpenASession() {
+        assertThat(service.generateResponse("Cho tôi gặp nhân viên hỗ trợ", "human-handoff"))
+            .contains("chọn nút Hỗ trợ trực tiếp", "chưa tự tạo phiên");
+        verifyNoInteractions(productRepository, categoryRepository);
+    }
+
+    @Test
+    void demoProfileNeverCallsExternalAiEvenWithAnAccidentalKey() {
+        MockEnvironment demo = new MockEnvironment();
+        demo.setActiveProfiles("demo");
+        ChatbotService local = new ChatbotService(productRepository, categoryRepository,
+            new IntentRecognitionService(),
+            new InteractionLoggingService(new StoreTime(
+                Clock.fixed(Instant.parse("2026-06-15T03:00:00Z"), StoreTime.ZONE))),
+            new StoreProperties(), mock(PlatformTransactionManager.class), demo);
+        ReflectionTestUtils.setField(local, "geminiApiKey", "must-not-leave-this-machine");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(
+            (RestTemplate) ReflectionTestUtils.getField(local, "restTemplate")).build();
+
+        assertThat(local.generateResponse("Chính sách đổi trả", "demo-profile"))
+            .contains("không dùng AI", "7 ngày");
+        server.verify(); // Zero expected requests: any external call fails this test.
     }
 }

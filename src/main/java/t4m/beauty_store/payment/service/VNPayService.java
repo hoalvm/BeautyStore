@@ -4,6 +4,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import t4m.beauty_store.config.ApiException;
 import t4m.beauty_store.config.VNPayConfig;
 import t4m.beauty_store.config.StoreTime;
 import t4m.beauty_store.payment.util.VNPayUtil;
@@ -30,6 +32,13 @@ public class VNPayService {
     private static final DateTimeFormatter VNPAY_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     private static final Pattern ORDER_NUMBER_PATTERN = Pattern.compile("[A-Za-z0-9_-]{1,100}");
     private static final Pattern SHA512_HEX_PATTERN = Pattern.compile("[A-Fa-f0-9]{128}");
+
+    public void requireAvailable() {
+        if (!vnPayConfig.isConfigured()) {
+            throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "PAYMENT_UNAVAILABLE",
+                "VNPay chưa được cấu hình. Vui lòng chọn thanh toán khi nhận hàng (COD).");
+        }
+    }
 
     /**
      * Tạo URL thanh toán VNPay

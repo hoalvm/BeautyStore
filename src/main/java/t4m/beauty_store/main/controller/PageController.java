@@ -14,7 +14,6 @@ import t4m.beauty_store.product.dto.ProductResponse;
 import t4m.beauty_store.product.entity.Product;
 import t4m.beauty_store.product.service.ProductService;
 
-import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -85,13 +84,15 @@ public class PageController {
     @GetMapping("/product/{id}")
     public ResponseEntity<Void> legacyProductDetail(
             @PathVariable Long id,
-            @org.springframework.web.bind.annotation.RequestParam(required = false) Long orderItemId) {
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Long orderItemId,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String orderNumber) {
         Product product = productService.getActiveProductById(id);
         if (product == null) return ResponseEntity.notFound().build();
-        String location = "/products/" + product.getSlug()
-            + (orderItemId == null ? "" : "?orderItemId=" + orderItemId);
+        var location = org.springframework.web.util.UriComponentsBuilder.fromPath("/products/{slug}");
+        if (orderItemId != null) location.queryParam("orderItemId", orderItemId);
+        if (orderNumber != null && orderNumber.matches("[A-Za-z0-9-]{1,100}")) location.queryParam("orderNumber", orderNumber);
         return ResponseEntity.status(HttpStatus.MOVED_PERMANENTLY)
-            .location(URI.create(location))
+            .location(location.buildAndExpand(product.getSlug()).encode().toUri())
             .build();
     }
 

@@ -93,6 +93,38 @@
         return typeof payload?.message === 'string' && payload.message.trim() ? payload.message : fallback;
     }
 
+    async function uploadEvidence(files, kind, orderItemId, headers, uploadedFiles = new Map()) {
+        const selected = Array.from(files || []);
+        if (!['review', 'return'].includes(kind) || !Number.isSafeInteger(Number(orderItemId)) || Number(orderItemId) < 1) {
+            throw new Error('Không xác định được sản phẩm trong đơn hàng.');
+        }
+        if (selected.length > 5) throw new Error('Tối đa 5 ảnh bằng chứng.');
+        // Validate the complete selection before uploading anything: an invalid last
+        // file must not consume the server's pending-evidence quota for earlier files.
+        if (selected.some(file => !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
+                || file.size <= 0 || file.size > 10 * 1024 * 1024)) {
+            throw new Error('Ảnh phải là JPEG, PNG hoặc WebP, không trống và không quá 10 MB.');
+        }
+        const scope = `${kind}:${orderItemId}`;
+        const result = [];
+        for (const file of selected) {
+            const cached = uploadedFiles.get(file);
+            if (cached?.scope === scope) {
+                result.push(cached.url);
+                continue;
+            }
+            const body = new FormData();
+            body.append('orderItemId', String(orderItemId));
+            body.append('image', file);
+            const upload = await fetch(`/api/uploads/${kind}`, { method: 'POST', headers, body });
+            const payload = await upload.json().catch(() => ({}));
+            if (!upload.ok || !payload.url) throw new Error(payload.message || 'Không thể tải ảnh bằng chứng.');
+            uploadedFiles.set(file, { scope, url: payload.url });
+            result.push(payload.url);
+        }
+        return result;
+    }
+
     function priceRange(product) {
         const variants = activeVariants(product);
         const prices = variants.map(variant => currentPrice(product, variant)).filter(Number.isFinite);
@@ -160,6 +192,7 @@
         formatPrice,
         parseBusinessDate,
         errorMessage,
+        uploadEvidence,
         productHref,
         facetLabels,
         setBusy,

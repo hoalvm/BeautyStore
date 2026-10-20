@@ -5,6 +5,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
 import t4m.beauty_store.order.dto.OrderResponse;
 import t4m.beauty_store.order.entity.Order;
 import t4m.beauty_store.shipper.service.ShipperService;
@@ -93,8 +95,9 @@ public class ShipperController {
     @PutMapping("/orders/{id}/complete")
     public ResponseEntity<?> completeDelivery(
             @PathVariable Long id,
-            Authentication authentication) {
-        Order order = shipperService.completeDelivery(id, authentication.getName());
+            Authentication authentication,
+            @RequestParam(value = "image", required = false) MultipartFile image) throws IOException {
+        Order order = shipperService.completeDelivery(id, authentication.getName(), image);
         return ResponseEntity.ok(OrderResponse.fromEntity(order));
     }
 
