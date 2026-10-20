@@ -84,8 +84,8 @@ public class SecurityConfig {
                         .requestMatchers("/css/**", "/js/**", "/images/**", "/fonts/**", "/vendor/**", "/favicon.ico",
                                 "/robots.txt", "/sitemap.xml", "/error")
                         .permitAll()
-                        // Controllers exist exclusively in the loopback-only demo profile.
-                        .requestMatchers(HttpMethod.GET, "/demo", "/demo/**").permitAll()
+                        // Only local product/evidence images remain public, never an OTP mailbox.
+                        .requestMatchers(HttpMethod.GET, "/demo/media/**").permitAll()
 
                         // Only authentication bootstrap/OTP operations are anonymous.
                         .requestMatchers(HttpMethod.POST,

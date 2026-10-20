@@ -47,7 +47,7 @@ jobs:
           assert all(int(suite.attrib.get(key, "0")) == 0 for key in ("skipped", "failures", "errors")), suite.attrib
           PY
 
-      - name: Smoke test the default standalone demo
+      - name: Smoke test local startup without sending email
         run: |
           java -jar target/beauty-store-0.0.1-SNAPSHOT.jar > target/demo-smoke.log 2>&1 &
           demo_pid=$!
@@ -70,5 +70,10 @@ jobs:
           with open("target/demo-catalog.json") as f:
               assert json.load(f)["totalElements"] == 40
           PY
-          curl --fail --silent http://localhost:8080/demo/inbox > /dev/null
+          curl --fail --silent http://localhost:8080/ > target/storefront.html
+          if grep -q '/demo/inbox' target/storefront.html; then
+            echo "Removed demo mailbox must not be linked"
+            exit 1
+          fi
+          test "$(curl --silent -o /dev/null -w '%{http_code}' http://localhost:8080/demo/api/mail)" = 302
           curl --fail --silent http://localhost:8080/vendor/bootstrap-5.3.0/bootstrap.min.css > /dev/null
