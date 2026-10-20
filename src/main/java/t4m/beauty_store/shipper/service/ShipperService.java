@@ -148,7 +148,8 @@ public class ShipperService {
             throw ApiException.conflict("Chỉ có thể hoàn thành đơn hàng đang giao");
         }
         byte[] normalizedImage = imageProcessor.prepare(image);
-        var completedAt = StoreTime.now();
+        // Match DATETIME(6) precision so the first response and an idempotent retry agree.
+        var completedAt = StoreTime.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
         order.setDeliveryProof(proofRepository.save(DeliveryProof.builder()
             .uploadedBy(shipper.getId()).uploadedAt(completedAt).imageBytes(normalizedImage).build()));
         order.setStatus(OrderStatus.DELIVERED);

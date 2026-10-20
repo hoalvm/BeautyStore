@@ -26,6 +26,14 @@ class DeliveryProofImageProcessorTests {
     }
 
     @Test
+    void normalizesDecodedWebpAndJpeg() throws Exception {
+        byte[] webp = java.util.Base64.getDecoder().decode("UklGRhwAAABXRUJQVlA4TA8AAAAvAUAAAAcQ9Y/+ByKi/wEA");
+        byte[] jpeg = processor.prepare(new MockMultipartFile("image", "proof.webp", "image/webp", webp));
+        assertThat(ImageIO.read(new ByteArrayInputStream(jpeg))).isNotNull();
+        assertThat(processor.prepare(new MockMultipartFile("image", "proof.jpg", "image/jpeg", jpeg))).isNotEmpty();
+    }
+
+    @Test
     void rejectsMissingOversizedAndDisguisedUploads() {
         assertThatIllegalArgumentException().isThrownBy(() -> processor.prepare(null));
         assertThatIllegalArgumentException().isThrownBy(() -> processor.prepare(
