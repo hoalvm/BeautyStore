@@ -6,6 +6,8 @@ let paymentPollTimer = null;
 let paymentPollAttempt = 0;
 let paymentPollDeadline = 0;
 let paymentPollInFlight = false;
+let paymentPollStopped = true;
+let viewingGuestOrder = false;
 const PAYMENT_POLL_DELAYS = [3000, 5000, 8000, 13000, 21000, 30000];
 const MAX_PAYMENT_POLL_ATTEMPTS = 60;
 
@@ -35,15 +37,14 @@ async function loadOrderDetails() {
     try {
         // Get order number from URL
         const pathParts = window.location.pathname.split('/');
-        const orderNumber = pathParts[pathParts.length - 1];
+        const orderNumber = decodeURIComponent(pathParts[pathParts.length - 1]);
 
         if (!orderNumber) {
             throw new Error('Order number not found');
         }
 
         const token = localStorage.getItem('authToken') || localStorage.getItem('token');
-        currentOrderToken = sessionStorage.getItem(`beautystore:order-token:${orderNumber}`)
-            || sessionStorage.getItem('guestOrderToken');
+        currentOrderToken = sessionStorage.getItem(`beautystore:order-token:${orderNumber}`);
         if (!token && !currentOrderToken) {
             window.location.href = `/order-confirmation/${encodeURIComponent(orderNumber)}`;
             return;
@@ -67,7 +68,7 @@ async function loadOrderDetails() {
         const order = await response.json();
 
         // Check if order is actually pending payment
-        if (order.status !== 'PENDING_PAYMENT') {
+        if (isFinalPaymentState(order)) {
             // Redirect to order confirmation if order is not pending payment
             window.location.href = '/order-confirmation/' + orderNumber;
             return;
@@ -80,8 +81,8 @@ async function loadOrderDetails() {
         displayOrderDetails(order);
 
         // Start countdown timer
-        startCountdown(order);
         startStatusPolling(order);
+        startCountdown(order);
 
         loadingState.style.display = 'none';
         orderDetails.style.display = 'block';
@@ -137,7 +138,7 @@ function displayOrderDetails(order) {
 
     // Order date
     if (order.createdAt) {
-        const orderDate = new Date(order.createdAt);
+        const orderDate = BeautyUI.parseBusinessDate(order.createdAt);
         const orderDateEl = document.getElementById('orderDate');
         if (orderDateEl) {
             orderDateEl.textContent = formatDate(orderDate);
@@ -237,22 +238,16 @@ function displayOrderItems(items) {
 }
 
 function startCountdown(order) {
-    if (!order?.createdAt && !order?.reservationExpiresAt) {
-        console.error('Created date not provided');
-        return;
-    }
-
-    const createdTime = new Date(order.createdAt);
-    
-    // Validate date
-    if (isNaN(createdTime.getTime())) {
-        console.error('Invalid created date:', order.createdAt);
-        return;
-    }
-
-    const expiryTime = order.reservationExpiresAt
-        ? new Date(order.reservationExpiresAt)
+    if (countdownInterval) clearInterval(countdownInterval);
+    countdownInterval = null;
+    const createdTime = BeautyUI.parseBusinessDate(order?.createdAt);
+    const expiryTime = order?.reservationExpiresAt
+        ? BeautyUI.parseBusinessDate(order.reservationExpiresAt)
         : new Date(createdTime.getTime() + 15 * 60 * 1000);
+    if (!Number.isFinite(expiryTime.getTime())) {
+        updatePaymentGuidance('Chưa xác định được thời hạn giữ hàng; đang kiểm tra trạng thái từ máy chủ.');
+        return;
+    }
 
     function updateCountdown() {
         const now = new Date();
@@ -268,8 +263,9 @@ function startCountdown(order) {
             updatePaymentGuidance('Thời gian giữ tồn đã hết. BeautyStore đang kiểm tra trạng thái cuối cùng của giao dịch; nếu chưa thanh toán, hãy hủy đơn và đặt lại từ giỏ hàng.');
             
             clearInterval(countdownInterval);
+            countdownInterval = null;
             scheduleStatusPoll(0, true);
-            return;
+            return false;
         }
 
         const minutes = Math.floor(timeLeft / 60000);
@@ -279,17 +275,18 @@ function startCountdown(order) {
         if (timeRemainingEl) {
             timeRemainingEl.textContent = `${minutes} phút ${seconds} giây`;
         }
+        return true;
     }
 
-    updateCountdown();
-    countdownInterval = setInterval(updateCountdown, 1000);
+    if (updateCountdown()) countdownInterval = setInterval(updateCountdown, 1000);
 }
 
 function startStatusPolling(order) {
     stopStatusPolling();
+    paymentPollStopped = false;
     paymentPollAttempt = 0;
     const reservationExpiry = order?.reservationExpiresAt
-        ? new Date(order.reservationExpiresAt).getTime()
+        ? BeautyUI.parseBusinessDate(order.reservationExpiresAt).getTime()
         : NaN;
     const fallbackDeadline = Date.now() + (16 * 60 * 1000);
     paymentPollDeadline = Number.isFinite(reservationExpiry)
@@ -299,6 +296,7 @@ function startStatusPolling(order) {
 }
 
 function scheduleStatusPoll(delay, force = false) {
+    if (paymentPollStopped) return;
     if (!force && (paymentPollAttempt >= MAX_PAYMENT_POLL_ATTEMPTS
             || Date.now() >= paymentPollDeadline)) {
         stopStatusPolling();
@@ -310,7 +308,7 @@ function scheduleStatusPoll(delay, force = false) {
 }
 
 async function pollOrderStatus() {
-    if (paymentPollInFlight || !currentOrder?.orderNumber) return;
+    if (paymentPollStopped || paymentPollInFlight || !currentOrder?.orderNumber) return;
     paymentPollInFlight = true;
     paymentPollAttempt += 1;
 
@@ -343,8 +341,7 @@ async function pollOrderStatus() {
 async function fetchOrder(orderNumber) {
     const token = localStorage.getItem('authToken') || localStorage.getItem('token');
     const guestToken = currentOrderToken
-        || sessionStorage.getItem(`beautystore:order-token:${orderNumber}`)
-        || sessionStorage.getItem('guestOrderToken');
+        || sessionStorage.getItem(`beautystore:order-token:${orderNumber}`);
     if (!token && !guestToken) {
         return new Response(null, { status: 401 });
     }
@@ -355,10 +352,12 @@ async function fetchOrder(orderNumber) {
             credentials: 'same-origin',
             cache: 'no-store'
         });
-        if ((memberResponse.status !== 401 && memberResponse.status !== 403) || !guestToken) {
+        if (![401, 403, 404].includes(memberResponse.status) || !guestToken) {
+            viewingGuestOrder = false;
             return memberResponse;
         }
     }
+    viewingGuestOrder = true;
     return fetch(`/api/guest-orders/${encodedOrderNumber}`, {
         headers: { 'X-Order-Token': guestToken },
         credentials: 'same-origin',
@@ -378,8 +377,11 @@ function updatePaymentGuidance(message) {
 }
 
 function stopStatusPolling() {
+    paymentPollStopped = true;
     if (paymentPollTimer) clearTimeout(paymentPollTimer);
     paymentPollTimer = null;
+    if (countdownInterval) clearInterval(countdownInterval);
+    countdownInterval = null;
 }
 
 function showCancelModal() {
@@ -394,23 +396,24 @@ async function handleCancelOrder() {
     }
 
     const btn = document.getElementById('confirmCancelBtn');
-    if (!btn) return;
+    if (!btn || btn.disabled) return;
     
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang hủy...';
 
     try {
         const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+        const memberRequest = Boolean(token) && !viewingGuestOrder;
         if (!token && !currentOrderToken) {
             window.location.href = `/order-confirmation/${encodeURIComponent(currentOrder.orderNumber)}`;
             return;
         }
 
-        const response = await fetch(token
+        const response = await fetch(memberRequest
             ? `/api/orders/${encodeURIComponent(currentOrder.orderNumber)}/cancel`
             : `/api/guest-orders/${encodeURIComponent(currentOrder.orderNumber)}/cancel`, {
             method: 'POST',
-            headers: token
+            headers: memberRequest
                 ? {'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json'}
                 : {'X-Order-Token': currentOrderToken, 'Content-Type': 'application/json'},
             credentials: 'same-origin'
@@ -435,7 +438,7 @@ async function handleCancelOrder() {
 
         // Redirect after 2 seconds
         setTimeout(() => {
-            window.location.href = token
+            window.location.href = memberRequest
                 ? '/orders'
                 : `/order-confirmation/${encodeURIComponent(currentOrder.orderNumber)}`;
         }, 2000);
@@ -456,7 +459,9 @@ function formatCurrency(amount) {
 }
 
 function formatDate(date) {
+    if (!Number.isFinite(date.getTime())) return 'Đang cập nhật';
     return new Intl.DateTimeFormat('vi-VN', {
+        timeZone: 'Asia/Ho_Chi_Minh',
         year: 'numeric',
         month: 'long',
         day: 'numeric',

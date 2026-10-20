@@ -3,6 +3,7 @@
 
     let product;
     let selectedVariant;
+    let cartRequestPending = false;
 
     document.addEventListener('DOMContentLoaded', loadProduct);
 
@@ -62,8 +63,21 @@
         const thumbnails = document.createElement('div');
         thumbnails.id = 'productThumbnails';
         thumbnails.className = 'd-flex flex-wrap gap-2 mt-3';
-        const gallery = product.gallery?.length ? product.gallery : [{ url: BeautyUI.productImage(product), altText: product.name }];
-        gallery.slice(0, 8).forEach((item, index) => {
+        column.append(frame, thumbnails);
+        return column;
+    }
+
+    function updateGallery() {
+        const thumbnails = document.getElementById('productThumbnails');
+        const image = document.getElementById('mainProductImage');
+        if (!thumbnails || !image) return;
+        const all = Array.isArray(product.gallery) ? product.gallery : [];
+        const variantImages = all.filter(item => item.variantId != null && String(item.variantId) === String(selectedVariant.id));
+        const commonImages = all.filter(item => item.variantId == null);
+        const gallery = [...variantImages, ...commonImages];
+        if (!gallery.length) gallery.push({ url: BeautyUI.productImage(product, selectedVariant), altText: product.name });
+        thumbnails.replaceChildren();
+        gallery.slice(0, 11).forEach((item, index) => {
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'border-0 bg-transparent p-0';
@@ -75,14 +89,13 @@
             button.addEventListener('click', () => {
                 image.src = thumb.src;
                 image.alt = thumb.alt;
-                thumbnails.querySelectorAll('img').forEach(item => item.removeAttribute('aria-current'));
-                thumb.setAttribute('aria-current', 'true');
+                thumbnails.querySelectorAll('button').forEach(item => item.removeAttribute('aria-current'));
+                button.setAttribute('aria-current', 'true');
             });
             button.appendChild(thumb);
             thumbnails.appendChild(button);
         });
-        column.append(frame, thumbnails);
-        return column;
+        image.alt = BeautyUI.text(product.name);
     }
 
     function createSummary() {
@@ -123,6 +136,7 @@
         quantity.type = 'number';
         quantity.className = 'form-control';
         quantity.min = '1';
+        quantity.step = '1';
         quantity.value = '1';
         quantity.style.maxWidth = '100px';
         quantityGroup.append(quantityLabel, quantity);
@@ -172,6 +186,7 @@
     }
 
     function updateVariantView() {
+        updateGallery();
         document.querySelectorAll('.variant-option').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.variantId === String(selectedVariant.id ?? ''))));
         const mainImage = document.getElementById('mainProductImage');
         if (mainImage) mainImage.src = BeautyUI.productImage(product, selectedVariant);
@@ -185,8 +200,10 @@
         stock.className = `small mb-3 ${available > 0 ? 'text-success' : 'text-danger'}`;
         stock.textContent = available > 0 ? `Còn hàng · SKU: ${BeautyUI.text(selectedVariant.sku, 'đang cập nhật')}` : 'Tạm hết hàng';
         const quantity = document.getElementById('quantityInput');
-        quantity.max = String(Math.max(1, available));
-        ['addToCartBtn', 'buyNowBtn'].forEach(id => { document.getElementById(id).disabled = available <= 0; });
+        quantity.max = String(Math.max(1, Math.min(999, available)));
+        quantity.value = String(Math.min(Number(quantity.max), Math.max(1, Math.floor(Number(quantity.value) || 1))));
+        quantity.disabled = available <= 0 || cartRequestPending;
+        ['addToCartBtn', 'buyNowBtn'].forEach(id => { document.getElementById(id).disabled = available <= 0 || cartRequestPending; });
         BeautyUI.announce(`Đã chọn ${variantLabel(selectedVariant)}, giá ${BeautyUI.formatPrice(current)}`);
     }
 
@@ -369,16 +386,30 @@
     }
 
     async function submitCart(buyNow) {
-        const quantity = Math.max(1, Number(document.getElementById('quantityInput')?.value) || 1);
+        if (cartRequestPending) return;
+        const input = document.getElementById('quantityInput');
+        const quantity = Number(input?.value);
+        const available = Number(selectedVariant?.availableStock || 0);
+        if (!selectedVariant?.id || !Number.isSafeInteger(quantity) || quantity < 1 || quantity > Math.min(999, available)) {
+            notify('Vui lòng chọn số lượng nguyên từ 1 đến số lượng còn hàng (tối đa 999).', 'warning');
+            input?.focus();
+            return;
+        }
+        const variantId = selectedVariant.id;
+        cartRequestPending = true;
+        updateVariantView();
         const token = localStorage.getItem('authToken') || localStorage.getItem('token');
         const headers = { 'Content-Type': 'application/json' };
         if (token) headers.Authorization = `Bearer ${token}`;
         try {
             const response = await fetch('/api/cart/add', {
                 method: 'POST', headers, credentials: 'same-origin',
-                body: JSON.stringify({ variantId: selectedVariant.id, quantity })
+                body: JSON.stringify({ variantId, quantity })
             });
-            if (!response.ok) throw new Error((await response.text()) || 'Không thể thêm sản phẩm vào giỏ.');
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(error.message || 'Không thể thêm sản phẩm vào giỏ.');
+            }
             if (buyNow) window.location.href = '/cart';
             else {
                 BeautyUI.announce(`Đã thêm ${quantity} ${product.name} vào giỏ hàng`);
@@ -386,18 +417,25 @@
                 if (typeof window.updateCartBadge === 'function') window.updateCartBadge();
             }
         } catch (error) { notify(error.message, 'danger'); }
+        finally { cartRequestPending = false; updateVariantView(); }
     }
 
     async function toggleFavorite(event) {
+        const button = event.currentTarget;
+        if (!button || button.disabled) return;
         const token = localStorage.getItem('authToken') || localStorage.getItem('token');
         if (!token) { notify('Vui lòng đăng nhập để lưu sản phẩm yêu thích.', 'warning'); return; }
+        button.disabled = true;
         try {
             const response = await fetch(`/api/favorites/toggle/${product.id}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
             if (!response.ok) throw new Error('Không thể cập nhật yêu thích.');
-            event.currentTarget.textContent = '♥';
-            event.currentTarget.setAttribute('aria-label', 'Đã thêm vào yêu thích');
+            const result = await response.json();
+            button.textContent = result.favorite ? '♥' : '♡';
+            button.setAttribute('aria-pressed', String(result.favorite === true));
+            button.setAttribute('aria-label', result.favorite ? 'Xóa khỏi yêu thích' : 'Thêm vào yêu thích');
             notify('Đã cập nhật danh sách yêu thích.', 'success');
         } catch (error) { notify(error.message, 'danger'); }
+        finally { button.disabled = false; }
     }
 
     async function loadRelatedProducts() {

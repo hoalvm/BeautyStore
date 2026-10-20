@@ -103,20 +103,25 @@
 
         const meta = document.createElement('p');
         meta.className = 'small text-muted mb-2';
-        meta.textContent = BeautyUI.text(variant.label || [variant.shadeName, variant.volume && `${variant.volume} ${variant.volumeUnit || ''}`].filter(Boolean).join(' · '), 'Nhiều lựa chọn');
+        meta.textContent = BeautyUI.variantLabel(variant) || 'Nhiều lựa chọn';
         const price = document.createElement('div');
         price.className = 'mt-auto d-flex align-items-baseline gap-2';
         const currentEl = document.createElement('strong');
         currentEl.className = 'text-danger';
-        currentEl.textContent = BeautyUI.formatPrice(current);
+        const range = BeautyUI.priceRange(product);
+        currentEl.textContent = range.min === range.max ? BeautyUI.formatPrice(range.min)
+            : `${BeautyUI.formatPrice(range.min)} – ${BeautyUI.formatPrice(range.max)}`;
         price.appendChild(currentEl);
-        if (current < regular) {
+        if (current < regular && range.min === range.max) {
             const old = document.createElement('del');
             old.className = 'small text-muted';
             old.textContent = BeautyUI.formatPrice(regular);
             price.appendChild(old);
         }
-        body.append(brand, title, meta, price);
+        const stock = document.createElement('p');
+        stock.className = 'small text-muted mt-2 mb-0';
+        stock.textContent = BeautyUI.isAvailable(product) ? 'Còn hàng' : 'Tạm hết hàng';
+        body.append(brand, title, meta, price, stock);
         card.append(imageLink, body);
         column.appendChild(card);
         return column;

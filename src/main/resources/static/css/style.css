@@ -618,7 +618,7 @@ h2 {
 
 .beauty-heading,
 .navbar-brand {
-    font-family: Georgia, "Times New Roman", serif;
+    font-family: "Beauty Cormorant", Georgia, serif;
     letter-spacing: -.025em;
 }
 
@@ -681,6 +681,7 @@ h2 {
 .beauty-sage-bg { background: #eef2ec; }
 .product-gallery-thumb { width: 76px; height: 76px; object-fit: cover; border-radius: .75rem; border: 1px solid var(--beauty-border); }
 .product-gallery-thumb[aria-current="true"] { border: 2px solid var(--beauty-berry); }
+button[aria-current="true"] > .product-gallery-thumb { border: 2px solid var(--beauty-berry); }
 .product-gallery-frame { height: auto; }
 
 @media (max-width: 991.98px) {

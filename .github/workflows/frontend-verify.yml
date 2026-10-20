@@ -1,0 +1,35 @@
+name: Frontend verify
+
+on:
+  push:
+    branches: [frontend]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      # Tests use Node built-ins only; no registry install or secrets needed.
+      - run: npm run check
+      - run: npm test
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '24'
+          cache: maven
+      - name: Render Thymeleaf pages against the test database
+        run: |
+          chmod +x mvnw
+          ./mvnw -B -Dtest=FrontendRenderingTests test

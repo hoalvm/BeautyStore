@@ -1,5 +1,7 @@
 // Order confirmation functionality
 let currentOrder = null;
+let currentOrderUsesGuestAccess = false;
+let guestOtpTimer = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     loadOrderDetails();
@@ -10,7 +12,7 @@ async function loadOrderDetails() {
     const orderDetails = document.getElementById('orderDetails');
     const errorState = document.getElementById('errorState');
     const pathParts = window.location.pathname.split('/');
-    const orderNumber = pathParts[pathParts.length - 1];
+    const orderNumber = decodeURIComponent(pathParts[pathParts.length - 1]);
 
     try {
         // Get order number from URL
@@ -23,21 +25,27 @@ async function loadOrderDetails() {
         const guestToken = sessionStorage.getItem(`beautystore:order-token:${orderNumber}`);
         let response;
         let order;
+        let checkoutReceipt = false;
+        currentOrderUsesGuestAccess = !token;
 
         if (token) {
             response = await fetch(`/api/orders/${encodedOrderNumber}`, {
                 headers: { 'Authorization': `Bearer ${token}` },
                 credentials: 'same-origin'
             });
-        } else if (guestToken) {
+        }
+        if (guestToken && (!response || [401, 403, 404].includes(response.status))) {
+            currentOrderUsesGuestAccess = true;
             response = await fetch(`/api/guest-orders/${encodedOrderNumber}`, {
                 headers: { 'X-Order-Token': guestToken },
                 credentials: 'same-origin'
             });
-        } else {
+        } else if (!response) {
             const cached = readCheckoutOrder(orderNumber);
             if (cached && cached.paymentMethod === 'COD') {
                 order = cached;
+                checkoutReceipt = true;
+                sessionStorage.removeItem('beautystore:last-order');
             } else {
                 renderGuestOrderAccess(orderNumber, cached?.customerEmail);
                 return;
@@ -46,7 +54,7 @@ async function loadOrderDetails() {
 
         if (response) {
             if (response.status === 401 || response.status === 403) {
-                if (!token) {
+                if (currentOrderUsesGuestAccess) {
                     sessionStorage.removeItem(`beautystore:order-token:${orderNumber}`);
                     renderGuestOrderAccess(orderNumber);
                     return;
@@ -64,13 +72,14 @@ async function loadOrderDetails() {
         currentOrder = order;
 
         // Check if order is PENDING_PAYMENT and redirect to payment-pending page
-        if (order.status === 'PENDING_PAYMENT' && order.paymentMethod === 'VNPAY') {
+        if (isAwaitingPayment(order)) {
             window.location.href = '/payment-pending/' + orderNumber;
             return;
         }
 
         // Keep the cancelled VNPay snapshot visible without offering another method.
-        if (order.paymentMethod === 'VNPAY' && order.status === 'CANCELLED') {
+        if (order.paymentMethod === 'VNPAY' && order.status === 'CANCELLED'
+                && order.paymentStatus !== 'RECONCILIATION_REQUIRED') {
             // Display order details FIRST
             displayOrderDetails(order);
             
@@ -89,10 +98,22 @@ async function loadOrderDetails() {
         orderDetails.style.display = 'block';
 
         // Add cancel button if applicable
-        addCancelButton(order);
+        if (checkoutReceipt) {
+            const notice = document.createElement('div');
+            notice.className = 'alert alert-info';
+            notice.textContent = 'Đây là biên nhận lúc đặt hàng. Xác minh OTP để xem trạng thái mới nhất hoặc hủy đơn.';
+            const verify = document.createElement('button');
+            verify.type = 'button';
+            verify.className = 'btn btn-outline-primary ms-2';
+            verify.textContent = 'Xác minh đơn hàng';
+            verify.addEventListener('click', () => renderGuestOrderAccess(orderNumber, order.customerEmail));
+            notice.appendChild(verify);
+            document.getElementById('orderStatusActions').replaceChildren(notice);
+        } else addCancelButton(order);
 
         // Trigger confetti animation
-        celebrateOrder();
+        if (!['CANCELLED', 'FAILED', 'REFUNDED'].includes(order.status)
+                && order.paymentStatus !== 'RECONCILIATION_REQUIRED') celebrateOrder();
 
     } catch (error) {
         console.error('Unable to load order details');
@@ -130,6 +151,8 @@ function readCheckoutOrder(orderNumber) {
 }
 
 function renderGuestOrderAccess(orderNumber, suggestedEmail = '') {
+    if (guestOtpTimer) clearInterval(guestOtpTimer);
+    guestOtpTimer = null;
     const loadingState = document.getElementById('loadingState');
     const orderDetails = document.getElementById('orderDetails');
     const errorState = document.getElementById('errorState');
@@ -177,6 +200,7 @@ function renderGuestOrderAccess(orderNumber, suggestedEmail = '') {
 
     form.addEventListener('submit', async event => {
         event.preventDefault();
+        if (requestButton.disabled) return;
         requestButton.disabled = true;
         requestButton.textContent = 'Đang gửi...';
         message.className = 'small mt-3 mb-0 text-muted';
@@ -220,13 +244,60 @@ function showGuestOtpForm(form, orderNumber, email, message) {
     verify.type = 'submit';
     verify.className = 'btn btn-danger w-100';
     verify.textContent = 'Xác minh và xem đơn';
+    const resend = document.createElement('button');
+    resend.type = 'button';
+    resend.className = 'btn btn-outline-secondary w-100 mt-2';
+    const changeEmail = document.createElement('button');
+    changeEmail.type = 'button';
+    changeEmail.className = 'btn btn-link w-100 mt-2';
+    changeEmail.textContent = 'Nhập lại email';
+    changeEmail.addEventListener('click', () => renderGuestOrderAccess(orderNumber, email));
     message.className = 'small mt-3 mb-0 text-success';
     message.textContent = 'Nếu thông tin khớp, OTP đã được gửi đến email của bạn.';
-    form.append(label, otp, verify, message);
+    form.append(label, otp, verify, resend, changeEmail, message);
     otp.focus();
+    let sentAt = Date.now();
+    let verifying = false;
+    let resending = false;
+    const updateCooldown = () => {
+        const seconds = Math.max(0, Math.ceil((sentAt + 60000 - Date.now()) / 1000));
+        resend.disabled = seconds > 0 || resending || verifying;
+        resend.textContent = seconds > 0 ? `Gửi lại mã sau ${seconds}s` : 'Gửi lại mã OTP';
+        if (Date.now() - sentAt >= 300000 && !verifying) {
+            verify.disabled = true;
+            message.textContent = 'Mã OTP đã hết hạn. Vui lòng gửi lại mã.';
+        }
+    };
+    if (guestOtpTimer) clearInterval(guestOtpTimer);
+    updateCooldown();
+    guestOtpTimer = setInterval(updateCooldown, 1000);
+    resend.addEventListener('click', async () => {
+        if (resend.disabled || resending || verifying) return;
+        resending = true;
+        verify.disabled = true;
+        updateCooldown();
+        try {
+            const response = await fetch('/api/guest-orders/access/request', {
+                method: 'POST', credentials: 'same-origin', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({orderNumber, email})
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(result.message || 'Chưa thể gửi lại OTP.');
+            sentAt = Date.now();
+            otp.value = '';
+            message.textContent = 'Nếu thông tin khớp, mã mới đã được gửi đến email của bạn.';
+            verify.disabled = false;
+            otp.focus();
+        } catch (error) {
+            message.textContent = error.message;
+            verify.disabled = Date.now() - sentAt >= 300000;
+        } finally {resending = false; updateCooldown();}
+    });
 
     form.addEventListener('submit', async event => {
         event.preventDefault();
+        if (verifying || resending || verify.disabled || !form.reportValidity()) return;
+        verifying = true;
         verify.disabled = true;
         verify.textContent = 'Đang xác minh...';
         try {
@@ -240,14 +311,38 @@ function showGuestOtpForm(form, orderNumber, email, message) {
             if (!response.ok || !result.accessToken) throw new Error(result.message || 'OTP không hợp lệ');
             sessionStorage.setItem(`beautystore:order-token:${orderNumber}`, result.accessToken);
             sessionStorage.setItem('guestOrderToken', result.accessToken);
+            clearInterval(guestOtpTimer);
+            guestOtpTimer = null;
             loadOrderDetails();
         } catch (error) {
             message.className = 'small mt-3 mb-0 text-danger';
             message.textContent = error.message || 'Không thể xác minh OTP.';
             verify.disabled = false;
             verify.textContent = 'Xác minh và xem đơn';
+        } finally {
+            verifying = false;
         }
     });
+}
+
+function isAwaitingPayment(order) {
+    return order?.status === 'PENDING_PAYMENT' && order?.paymentMethod === 'VNPAY'
+        && !['PAID', 'FAILED', 'CANCELLED', 'EXPIRED', 'RECONCILIATION_REQUIRED'].includes(order.paymentStatus);
+}
+
+function updateOrderStatusHeading(order) {
+    const title = document.getElementById('orderStatusTitle');
+    const message = document.getElementById('orderStatusMessage');
+    const icon = document.getElementById('orderStatusIcon');
+    if (order.paymentStatus === 'RECONCILIATION_REQUIRED') {
+        title.textContent = 'Giao dịch đang được đối soát';
+        message.textContent = 'BeautyStore đang kiểm tra thanh toán. Vui lòng không thanh toán lại hoặc tạo đơn trùng; liên hệ hỗ trợ nếu cần.';
+    } else if (['CANCELLED', 'FAILED', 'REFUNDED'].includes(order.status)) {
+        title.textContent = {CANCELLED:'Đơn hàng đã hủy', FAILED:'Giao hàng không thành công', REFUNDED:'Đơn hàng đã hoàn tiền'}[order.status];
+        message.textContent = 'Thông tin bên dưới là lịch sử đơn hàng, không phải xác nhận giao hàng thành công.';
+    } else return;
+    title.classList.remove('beauty-gradient-text');
+    icon.innerHTML = '<i class="fas fa-circle-info text-warning" style="font-size: 5rem;" aria-hidden="true"></i>';
 }
 
 function displayCancelledPaymentMessage(order) {
@@ -461,15 +556,15 @@ function displayOrderDetails(order) {
     }
     
     document.getElementById('orderTotal').textContent = formatPrice(order.totalAmount);
+    updateOrderStatusHeading(order);
     if (order.status === 'DELIVERED') loadReturnProgress(order);
 }
 
 function orderAccessHeaders(orderNumber, json = false) {
     const headers = {};
     const token = localStorage.getItem('authToken') || localStorage.getItem('token');
-    const guestToken = sessionStorage.getItem(`beautystore:order-token:${orderNumber}`)
-        || sessionStorage.getItem('guestOrderToken');
-    if (token) headers.Authorization = `Bearer ${token}`;
+    const guestToken = sessionStorage.getItem(`beautystore:order-token:${orderNumber}`);
+    if (token && !currentOrderUsesGuestAccess) headers.Authorization = `Bearer ${token}`;
     if (guestToken) headers['X-Order-Token'] = guestToken;
     if (json) headers['Content-Type'] = 'application/json';
     return headers;
@@ -686,6 +781,7 @@ function getPaymentMethodText(method) {
 }
 
 function celebrateOrder() {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
     // Add success animation
     const successIcon = document.querySelector('.success-animation i');
     if (successIcon) {
@@ -724,7 +820,7 @@ function addCancelButton(order) {
     }
     
     // Một TxnRef VNPay chỉ được dùng một lần; không cấp lại liên kết thanh toán.
-    if (order.status === 'PENDING_PAYMENT' && order.paymentMethod === 'VNPAY') {
+    if (isAwaitingPayment(order)) {
         const warningAlert = document.createElement('div');
         warningAlert.className = 'alert alert-warning mt-3';
         const icon = document.createElement('i');
@@ -785,15 +881,14 @@ function setupCancelConfirmHandler() {
 async function performCancelOrder() {
     try {
         const token = localStorage.getItem('authToken') || localStorage.getItem('token');
-        const guestToken = sessionStorage.getItem(`beautystore:order-token:${currentCancelOrderNumber}`)
-            || sessionStorage.getItem('guestOrderToken');
+        const guestToken = sessionStorage.getItem(`beautystore:order-token:${currentCancelOrderNumber}`);
 
         if (!token && !guestToken) {
             showErrorModal('Vui lòng xác minh OTP để hủy đơn hàng.');
             return;
         }
 
-        const memberRequest = Boolean(token);
+        const memberRequest = Boolean(token) && !currentOrderUsesGuestAccess;
         const response = await fetch(memberRequest
             ? `/api/orders/${currentCancelOrderId}/cancel`
             : `/api/guest-orders/${encodeURIComponent(currentCancelOrderNumber)}/cancel`, {

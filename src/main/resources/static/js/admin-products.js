@@ -6,6 +6,8 @@ const pageSize = 20;
 let categories = [];
 let brands = [];
 let editingProduct = null;
+let editingVariant = null;
+let savingProduct = false;
 let currentBatchVariant = null;
 let currentInventoryAlertKind = 'low';
 let returnToProductModalAfterBatch = false;
@@ -350,7 +352,7 @@ async function loadProducts() {
         const result = document.getElementById('searchResultText');
         if (result) {
             result.hidden = !currentSearch;
-            result.textContent = currentSearch ? `Kết quả cho “${currentSearch}”` : '';
+            result.textContent = currentSearch ? `Kết quả cho “${currentSearch}”${currentStockFilter ? ' · Tồn kho được lọc trong từng trang kết quả; chuyển trang để xem tiếp.' : ''}` : '';
         }
     } catch (error) {
         showTableMessage(error.message, 'fas fa-circle-exclamation text-danger');
@@ -365,7 +367,8 @@ function filterStockPage(data) {
         if (currentStockFilter === 'low-stock') return stock > 0 && stock <= threshold;
         return stock > 0;
     });
-    return { ...data, content: products, totalElements: products.length, totalPages: 1 };
+    // Keep server pagination so matches on later pages remain reachable.
+    return { ...data, content: products, numberOfElements: products.length, empty: products.length === 0 };
 }
 
 function renderProducts(products) {
@@ -443,6 +446,7 @@ function iconButton(title, style, icon) {
 
 function openAddModal() {
     editingProduct = null;
+    editingVariant = null;
     document.getElementById('modalTitle').textContent = 'Thêm sản phẩm mỹ phẩm';
     document.getElementById('productForm').reset();
     document.getElementById('productId').value = '';
@@ -500,6 +504,7 @@ function fillProductForm(product) {
 }
 
 function fillVariantForm(variant, product = editingProduct || {}) {
+    editingVariant = variant;
     setValue('editingVariantId', variant.id);
     setValue('productSku', variant.sku);
     setValue('productBarcode', variant.barcode);
@@ -516,6 +521,7 @@ function fillVariantForm(variant, product = editingProduct || {}) {
 }
 
 async function saveProduct() {
+    if (savingProduct) return;
     const form = document.getElementById('productForm');
     if (!form.reportValidity()) return;
     const id = value('productId');
@@ -528,6 +534,7 @@ async function saveProduct() {
     if (!id) payload.defaultVariant = { ...variant, defaultVariant: true, active: true };
     const initialStock = id ? 0 : numberValue('productStock', 0);
     const saveButton = document.querySelector('#productModal .modal-footer .btn-primary');
+    savingProduct = true;
     saveButton.disabled = true;
     saveButton.textContent = 'Đang lưu...';
     try {
@@ -536,6 +543,14 @@ async function saveProduct() {
         });
         const result = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(result.message || result.error || 'Không thể lưu sản phẩm.');
+        // Creation is already committed: retries must update this product, never create a duplicate.
+        if (!id) {
+            editingProduct = result;
+            setValue('productId', result.id);
+            const createdVariant = defaultVariant(result);
+            editingVariant = createdVariant;
+            setValue('editingVariantId', createdVariant.id);
+        }
         if (id && value('editingVariantId')) await saveExistingVariant(value('editingVariantId'), variant);
         if (!id && initialStock > 0) await createInitialInventoryBatch(result, initialStock);
         const image = document.getElementById('productImageFile').files[0];
@@ -543,8 +558,15 @@ async function saveProduct() {
         showToast(id ? 'Đã cập nhật sản phẩm.' : 'Đã tạo sản phẩm.', 'success');
         bootstrap.Modal.getInstance(document.getElementById('productModal'))?.hide();
         loadProducts();
-    } catch (error) { showToast(error.message, 'danger'); }
-    finally {
+    } catch (error) {
+        showToast(error.message, 'danger');
+        if (!id && value('productId')) {
+            document.getElementById('productStock').disabled = true;
+            await Promise.allSettled([loadVariants(value('productId')), loadGallery(value('productId')), loadProducts()]);
+            showToast('Sản phẩm đã được tạo. Kiểm tra biến thể, lô và gallery trước khi thử lại bước chưa thành công.', 'warning');
+        }
+    } finally {
+        savingProduct = false;
         saveButton.disabled = false;
         const icon = document.createElement('i');
         icon.className = 'fas fa-save me-2';
@@ -577,7 +599,8 @@ function productPayload() {
         description: nullable('productDescription'), benefits: nullable('productBenefits'), inci: nullable('productInci'),
         directions: nullable('productDirections'), warnings: nullable('productWarnings'), origin: nullable('productOrigin'), material: nullable('productMaterial'),
         warrantyMonths: nullableNumber('productWarrantyMonths'), specifications: nullable('productSpecifications'), spf: nullable('productSpf'),
-        paoMonths: nullableNumber('productPaoMonths'), shelfLifeMonths: nullableNumber('productShelfLifeMonths'), facetIds: [],
+        // This form does not edit taxonomy; omission preserves existing assignments.
+        paoMonths: nullableNumber('productPaoMonths'), shelfLifeMonths: nullableNumber('productShelfLifeMonths'),
         featured: document.getElementById('productFeatured').checked, active: document.getElementById('productActive').checked
     };
 }
@@ -587,12 +610,12 @@ function variantPayload() {
         sku: value('productSku').toUpperCase(), barcode: nullable('productBarcode'), label: nullable('productVariantLabel'),
         shadeName: nullable('productShadeName'), shadeHex: value('productShadeName') ? value('productShadeHex') : null,
         sizeValue: nullableNumber('productVolume'), sizeUnit: nullable('productUnit'), price: numberValue('productPrice', 0),
-        discountPrice: nullableNumber('productDiscountPrice'), lowStockThreshold: numberValue('productLowStockThreshold', 10), active: true
+        discountPrice: nullableNumber('productDiscountPrice'), lowStockThreshold: numberValue('productLowStockThreshold', 10), active: editingVariant?.active !== false
     };
 }
 
 async function saveExistingVariant(id, payload) {
-    const response = await fetch(`/api/admin/variants/${id}`, { method: 'PUT', headers: tokenHeaders(true), body: JSON.stringify({ ...payload, defaultVariant: true }) });
+    const response = await fetch(`/api/admin/variants/${id}`, { method: 'PUT', headers: tokenHeaders(true), body: JSON.stringify({ ...payload, defaultVariant: editingVariant?.defaultVariant === true }) });
     if (!response.ok) {
         const error = await response.json().catch(() => ({}));
         throw new Error(error.message || 'Sản phẩm đã lưu nhưng không thể cập nhật biến thể.');
@@ -602,7 +625,7 @@ async function saveExistingVariant(id, payload) {
 async function createVariantFromForm() {
     const productId = value('productId');
     if (!productId) { showToast('Hãy lưu sản phẩm trước khi thêm biến thể.', 'warning'); return; }
-    const payload = { ...variantPayload(), defaultVariant: false };
+    const payload = { ...variantPayload(), defaultVariant: false, active: true };
     if (!payload.sku) { showToast('SKU biến thể là bắt buộc.', 'warning'); return; }
     try {
         const response = await fetch(`/api/admin/products/${productId}/variants`, { method: 'POST', headers: tokenHeaders(true), body: JSON.stringify(payload) });
@@ -961,14 +984,14 @@ async function loadInventoryAlerts(kind = currentInventoryAlertKind) {
     try {
         if (kind === 'low' || kind === 'out') {
             const threshold = Math.max(1, numberValue('lowStockAlertThreshold', 10));
-            const path = kind === 'low' ? `/api/admin/products/low-stock?page=0&size=200&threshold=${threshold}` : '/api/admin/products/out-of-stock?page=0&size=200';
+            const path = kind === 'low' ? `/api/admin/products/low-stock?page=0&size=100&threshold=${threshold}` : '/api/admin/products/out-of-stock?page=0&size=100';
             const response = await fetch(path, { headers: tokenHeaders() });
             if (!response.ok) throw new Error(await responseError(response, 'Không thể tải cảnh báo tồn kho.'));
             const page = await response.json();
             const rows = productStockAlertRows(page.content || [], kind, threshold);
             body.replaceChildren(...rows);
             if (!rows.length) body.appendChild(tableMessageRow(kind === 'low' ? 'Không có sản phẩm sắp hết.' : 'Không có sản phẩm hết hàng.', 8));
-            summary.textContent = `${kind === 'low' ? 'Sắp hết' : 'Hết hàng'}: ${page.totalElements ?? rows.length} sản phẩm${Number(page.totalElements || 0) > 200 ? ' (đang hiển thị 200 sản phẩm đầu)' : ''}.`;
+            summary.textContent = `${kind === 'low' ? 'Sắp hết' : 'Hết hàng'}: ${page.totalElements ?? rows.length} sản phẩm${Number(page.totalElements || 0) > 100 ? ' (đang hiển thị 100 sản phẩm đầu)' : ''}.`;
             return;
         }
 

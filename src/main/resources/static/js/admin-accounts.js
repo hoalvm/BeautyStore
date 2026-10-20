@@ -4,6 +4,8 @@ let currentPage = 0;
 let pageSize = 10;
 let selectedAccountIds = new Set();
 let accountToDelete = null;
+let accountListRequest = 0;
+let savingAccount = false;
 
 // Helper function to get token
 function getAuthToken() {
@@ -20,6 +22,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Load accounts with filters and pagination
 function loadAccounts() {
+    const request = ++accountListRequest;
     const search = document.getElementById('searchInput').value;
     const roleFilter = document.getElementById('roleFilter').value;
     pageSize = parseInt(document.getElementById('pageSizeSelect').value);
@@ -29,6 +32,7 @@ function loadAccounts() {
         size: pageSize,
         search: search,
         roleFilter: roleFilter,
+        statusFilter: document.getElementById('statusFilter')?.value || '',
         sortBy: 'created',
         sortDir: 'desc'
     });
@@ -38,17 +42,38 @@ function loadAccounts() {
             'Authorization': 'Bearer ' + getAuthToken()
         }
     })
-    .then(response => response.json())
+    .then(readAccountResponse)
     .then(data => {
+        if (request !== accountListRequest) return;
         displayAccounts(data.accounts);
         updatePagination(data.currentPage, data.totalPages, data.totalItems);
         selectedAccountIds.clear();
         document.getElementById('selectAll').checked = false;
     })
     .catch(error => {
+        if (request !== accountListRequest) return;
         console.error('Error loading accounts:', error);
         showAlert('Không thể tải danh sách tài khoản', 'danger');
     });
+}
+
+async function readAccountResponse(response) {
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.message || 'Không thể thực hiện yêu cầu tài khoản.');
+    return data;
+}
+
+function validAccountPassword(password) {
+    return typeof password === 'string' && password.length >= 8 && password.length <= 128
+        && !/\s/.test(password)
+        && /[A-Z]/.test(password) && /[a-z]/.test(password) && /[0-9]/.test(password)
+        && /[^a-zA-Z0-9\s]/.test(password);
+}
+
+function setAccountSaving(value) {
+    savingAccount = value;
+    const button = document.querySelector('#accountModal .modal-footer .btn-primary');
+    if (button) button.disabled = value;
 }
 
 // Display accounts in table
@@ -374,6 +399,7 @@ function editAccount(id) {
 
 // Save account
 function saveAccount() {
+    if (savingAccount || !document.getElementById('accountForm').reportValidity()) return;
     const id = document.getElementById('accountId').value;
     const name = document.getElementById('accountName').value.trim();
     const email = document.getElementById('accountEmail').value.trim();
@@ -404,8 +430,8 @@ function saveAccount() {
                 return;
             }
             
-            if (newPassword.length < 6) {
-                showAlert('Mật khẩu mới phải có ít nhất 6 ký tự', 'warning');
+            if (!validAccountPassword(newPassword)) {
+                showAlert('Mật khẩu phải có 8–128 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt.', 'warning');
                 return;
             }
             
@@ -429,8 +455,8 @@ function saveAccount() {
             return;
         }
 
-        if (password.length < 6) {
-            showAlert('Mật khẩu phải có ít nhất 6 ký tự', 'warning');
+        if (!validAccountPassword(password)) {
+            showAlert('Mật khẩu phải có 8–128 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt.', 'warning');
             return;
         }
 
@@ -440,6 +466,8 @@ function saveAccount() {
 
 // Create account
 function createAccountData(data) {
+    if (savingAccount) return;
+    setAccountSaving(true);
     fetch('/api/admin/accounts', {
         method: 'POST',
         headers: {
@@ -462,12 +490,14 @@ function createAccountData(data) {
     })
     .catch(error => {
         console.error('Error:', error);
-        showAlert('Có lỗi xảy ra khi tạo tài khoản', 'danger');
-    });
+        showAlert(error.message || 'Có lỗi xảy ra khi tạo tài khoản', 'danger');
+    }).finally(() => setAccountSaving(false));
 }
 
 // Update account
 function updateAccountData(id, data) {
+    if (savingAccount) return;
+    setAccountSaving(true);
     fetch(`/api/admin/accounts/${id}`, {
         method: 'PUT',
         headers: {
@@ -490,8 +520,8 @@ function updateAccountData(id, data) {
     })
     .catch(error => {
         console.error('Error:', error);
-        showAlert('Có lỗi xảy ra khi cập nhật tài khoản', 'danger');
-    });
+        showAlert(error.message || 'Có lỗi xảy ra khi cập nhật tài khoản', 'danger');
+    }).finally(() => setAccountSaving(false));
 }
 
 // View account details

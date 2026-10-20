@@ -3,9 +3,11 @@ let currentPage = 0;
 const pageSize = 10;
 let currentFilters = {};
 let deleteVoucherId = null;
+const pendingVoucherUpdates = new Set();
+let voucherListRequest = 0;
 
 document.addEventListener('DOMContentLoaded', function() {
-    checkAdminAuth();
+    if (!checkAdminAuth()) return;
     loadStatistics();
     loadVouchers();
 });
@@ -17,7 +19,7 @@ function checkAdminAuth() {
     if (!authToken || !userRole || !userRole.includes('ADMIN')) {
         alert('Bạn không có quyền truy cập trang này');
         window.location.href = '/login';
-        return;
+        return false;
     }
 
     // Load admin info
@@ -25,6 +27,7 @@ function checkAdminAuth() {
     const adminEmail = localStorage.getItem('userEmail');
     if (adminName) document.getElementById('adminName').textContent = adminName;
     if (adminEmail) document.getElementById('adminEmail').textContent = adminEmail;
+    return true;
 }
 
 function getAuthHeaders() {
@@ -52,6 +55,7 @@ function loadStatistics() {
 }
 
 function loadVouchers(page = 0) {
+    const request = ++voucherListRequest;
     currentPage = page;
     const params = new URLSearchParams({
         page: page,
@@ -68,12 +72,18 @@ function loadVouchers(page = 0) {
     fetch(`/api/admin/vouchers?${params.toString()}`, {
         headers: getAuthHeaders()
     })
-    .then(response => response.json())
+    .then(async response => {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.message || 'Không thể tải mã giảm giá.');
+        return payload;
+    })
     .then(data => {
+        if (request !== voucherListRequest) return;
         displayVouchers(data.content);
         displayPagination(data);
     })
     .catch(error => {
+        if (request !== voucherListRequest) return;
         console.error('Error loading vouchers:', error);
         renderVoucherTableMessage('Lỗi tải dữ liệu', 'text-danger');
     });
@@ -308,10 +318,12 @@ function refreshVouchers() {
 }
 
 function toggleStatus(id) {
+    if (pendingVoucherUpdates.has(id)) return;
     if (!confirm('Bạn có chắc chắn muốn thay đổi trạng thái voucher này?')) {
         return;
     }
 
+    pendingVoucherUpdates.add(id);
     fetch(`/api/admin/vouchers/${id}/toggle`, {
         method: 'PATCH',
         headers: getAuthHeaders()
@@ -328,7 +340,7 @@ function toggleStatus(id) {
     .catch(error => {
         console.error('Error toggling status:', error);
         showAlert('Lỗi kết nối máy chủ', 'danger');
-    });
+    }).finally(() => pendingVoucherUpdates.delete(id));
 }
 
 function showDeleteModal(id) {

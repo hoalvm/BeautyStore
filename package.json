@@ -1,0 +1,9 @@
+{
+  "name": "beautystore-frontend-checks",
+  "private": true,
+  "scripts": {
+    "test": "node --test src/test/frontend/*.test.cjs",
+    "check": "node scripts/check-frontend.cjs"
+  },
+  "engines": { "node": ">=22" }
+}

@@ -169,7 +169,7 @@
                       <div
                         class="text-xs font-weight-bold text-warning text-uppercase mb-1"
                       >
-                        Đánh giá trung bình
+                        Trung bình trên trang
                       </div>
                       <div class="h5 mb-0 font-weight-bold text-gray-800" id="averageRating">
                         0.0
@@ -191,7 +191,7 @@
                       <div
                         class="text-xs font-weight-bold text-success text-uppercase mb-1"
                       >
-                        5 sao
+                        5 sao trên trang
                       </div>
                       <div class="h5 mb-0 font-weight-bold text-gray-800" id="fiveStars">
                         0
@@ -213,7 +213,7 @@
                       <div
                         class="text-xs font-weight-bold text-danger text-uppercase mb-1"
                       >
-                        1-2 sao
+                        1-2 sao trên trang
                       </div>
                       <div class="h5 mb-0 font-weight-bold text-gray-800" id="lowStars">
                         0
@@ -239,7 +239,7 @@
               <div class="row g-3">
                 <!-- Search by User Name -->
                 <div class="col-md-3">
-                  <label class="form-label">Tìm theo tên người dùng</label>
+                  <label class="form-label" for="userNameSearch">Tên người dùng trên trang</label>
                   <input
                     type="text"
                     class="form-control"
@@ -250,18 +250,19 @@
 
                 <!-- Search by Product Name -->
                 <div class="col-md-3">
-                  <label class="form-label">Tìm theo tên sản phẩm</label>
+                  <label class="form-label" for="productNameSearch">Mã sản phẩm trên trang</label>
                   <input
                     type="text"
                     class="form-control"
                     id="productNameSearch"
-                    placeholder="Nhập tên sản phẩm..."
+                    placeholder="Nhập mã sản phẩm, ví dụ 12"
+                    inputmode="numeric"
                   />
                 </div>
 
                 <!-- Moderation status -->
                 <div class="col-md-3">
-                  <label class="form-label">Trạng thái kiểm duyệt</label>
+                  <label class="form-label" for="minStars">Trạng thái kiểm duyệt (toàn bộ)</label>
                   <select class="form-select" id="minStars">
                     <option value="">Tất cả trạng thái</option>
                     <option value="PENDING">Chờ duyệt</option>
@@ -331,11 +332,11 @@
                       <th style="width: 90px">Sản phẩm</th>
                       <th>Nội dung đánh giá</th>
                       <th>Khách hàng</th>
-                      <th style="width: 120px; cursor: pointer" onclick="changeSorting('stars')">
-                        Đánh giá <i class="fas fa-sort" id="sortStarsIcon"></i>
+                      <th style="width: 120px">
+                        Đánh giá
                       </th>
-                      <th style="width: 180px; cursor: pointer" onclick="changeSorting('createdAt')">
-                        Ngày tạo <i class="fas fa-sort-down" id="sortCreatedAtIcon"></i>
+                      <th style="width: 180px">
+                        Ngày tạo (mới nhất)
                       </th>
                       <th style="width: 160px" class="text-center">Kiểm duyệt</th>
                     </tr>

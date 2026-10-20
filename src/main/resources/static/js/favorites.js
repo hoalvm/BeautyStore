@@ -1,5 +1,6 @@
 (function () {
     'use strict';
+    let loadVersion = 0;
 
     document.addEventListener('DOMContentLoaded', loadFavorites);
 
@@ -13,16 +14,22 @@
 
     async function loadFavorites() {
         const container = document.getElementById('favoritesContainer');
+        if (!container) return;
+        const version = ++loadVersion;
         const token = localStorage.getItem('authToken') || localStorage.getItem('token');
         if (!token) {
-            renderEmpty(container, 'Đăng nhập để xem danh sách sản phẩm yêu thích.', 'Đăng nhập', '/login');
+            renderEmpty(container, 'Đăng nhập để xem danh sách sản phẩm yêu thích.', 'Đăng nhập', '/login?redirect=/favorites');
             return;
         }
         try {
             const response = await fetch('/api/favorites', { headers: authHeaders() });
-            if (response.status === 401) throw new Error('Phiên đăng nhập đã hết hạn.');
+            if (response.status === 401) {
+                if (version === loadVersion) renderEmpty(container, 'Phiên đăng nhập đã hết hạn.', 'Đăng nhập lại', '/login?redirect=/favorites');
+                return;
+            }
             if (!response.ok) throw new Error('Không thể tải danh sách yêu thích.');
             const favorites = await response.json();
+            if (version !== loadVersion) return;
             document.getElementById('favoriteCount').textContent = String(favorites.length);
             if (!favorites.length) {
                 renderEmpty(container, 'Hãy lưu lại sản phẩm bạn quan tâm để dễ dàng tìm lại.', 'Khám phá mỹ phẩm', '/products');
@@ -30,6 +37,7 @@
             }
             container.replaceChildren(...favorites.map(createFavoriteCard));
         } catch (error) {
+            if (version !== loadVersion) return;
             renderEmpty(container, error.message, 'Thử lại', '#');
             container.querySelector('a')?.addEventListener('click', event => { event.preventDefault(); loadFavorites(); });
         }
@@ -53,17 +61,24 @@
         body.className = 'p-3 d-flex flex-column flex-grow-1';
         body.append(textElement('p', 'beauty-eyebrow mb-1', BeautyUI.brandName(product)));
         const title = textElement('h2', 'h6 lh-base', product.name);
-        const meta = textElement('p', 'small text-muted', variant.label || [variant.shadeName, variant.volume && `${variant.volume} ${variant.volumeUnit || ''}`].filter(Boolean).join(' · '));
-        const price = textElement('strong', 'text-danger mt-auto mb-3', BeautyUI.formatPrice(BeautyUI.currentPrice(product, variant)));
+        const meta = textElement('p', 'small text-muted', BeautyUI.variantLabel(variant));
+        const range = BeautyUI.priceRange(product);
+        const price = textElement('strong', 'text-danger mt-auto mb-3', range.min === range.max
+            ? BeautyUI.formatPrice(range.min) : `${BeautyUI.formatPrice(range.min)} – ${BeautyUI.formatPrice(range.max)}`);
         const actions = document.createElement('div');
         actions.className = 'd-grid gap-2';
-        const add = textElement('button', 'btn btn-primary btn-sm', 'Thêm vào giỏ');
+        const available = BeautyUI.isAvailable(product);
+        const multipleVariants = BeautyUI.activeVariants(product).length > 1;
+        const add = textElement('button', 'btn btn-primary btn-sm', !available ? 'Không khả dụng' : multipleVariants ? 'Chọn phân loại' : 'Thêm vào giỏ');
         add.type = 'button';
-        add.disabled = product.inStock === false;
-        add.addEventListener('click', () => addToCart(product, variant));
+        add.disabled = !available;
+        add.addEventListener('click', () => {
+            if (multipleVariants) window.location.href = BeautyUI.productHref(product);
+            else addToCart(product, variant, add);
+        });
         const remove = textElement('button', 'btn btn-outline-danger btn-sm', 'Bỏ yêu thích');
         remove.type = 'button';
-        remove.addEventListener('click', () => removeFavorite(product.id));
+        remove.addEventListener('click', () => removeFavorite(product.id, remove));
         actions.append(add, remove);
         body.append(title, meta, price, actions);
         card.append(link, body);
@@ -71,25 +86,31 @@
         return column;
     }
 
-    async function removeFavorite(productId) {
+    async function removeFavorite(productId, button) {
+        if (button?.disabled) return;
+        if (button) button.disabled = true;
         try {
             const response = await fetch(`/api/favorites/remove/${encodeURIComponent(productId)}`, { method: 'DELETE', headers: authHeaders() });
             if (!response.ok) throw new Error('Không thể bỏ sản phẩm yêu thích.');
             notify('Đã bỏ sản phẩm khỏi danh sách yêu thích.', 'success');
-            loadFavorites();
+            await loadFavorites();
         } catch (error) { notify(error.message, 'danger'); }
+        finally { if (button) button.disabled = false; }
     }
 
-    async function addToCart(product, variant) {
+    async function addToCart(product, variant, button) {
+        if (button?.disabled || !BeautyUI.isAvailable(product)) return;
+        if (button) button.disabled = true;
         try {
             const response = await fetch('/api/cart/add', {
                 method: 'POST', headers: authHeaders(true), credentials: 'same-origin',
                 body: JSON.stringify({ variantId: variant.id, quantity: 1 })
             });
-            if (!response.ok) throw new Error('Không thể thêm vào giỏ hàng.');
+            if (!response.ok) throw new Error(await BeautyUI.errorMessage(response, 'Không thể thêm vào giỏ hàng.'));
             notify('Đã thêm sản phẩm vào giỏ hàng.', 'success');
             if (typeof window.updateCartBadge === 'function') window.updateCartBadge();
         } catch (error) { notify(error.message, 'danger'); }
+        finally { if (button) button.disabled = false; }
     }
 
     function renderEmpty(container, message, action, href) {

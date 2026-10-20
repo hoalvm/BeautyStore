@@ -2,15 +2,21 @@
 
 let isEditMode = false;
 let voucherId = null;
+let formReady = false;
+let submitting = false;
+let variantOptionsRequest = 0;
 
 document.addEventListener('DOMContentLoaded', async () => {
     if (!checkAdminAuth()) return;
     setupFormHandlers();
     detectEditMode();
+    document.getElementById('submitBtn').disabled = true;
     if (!isEditMode) setDefaultDates();
     try {
         await loadScopeOptions();
         if (isEditMode) await loadVoucherData(voucherId);
+        formReady = true;
+        document.getElementById('submitBtn').disabled = false;
     } catch (error) {
         showAlert(error.message || 'Không thể tải dữ liệu biểu mẫu.', 'danger');
     }
@@ -36,7 +42,9 @@ function headers() { return { Authorization: `Bearer ${authToken()}`, 'Content-T
 function setupFormHandlers() {
     document.querySelectorAll('input[name="discountType"]').forEach(input =>
         input.addEventListener('change', event => updateDiscountControls(event.target.value)));
-    document.getElementById('productIds').addEventListener('change', loadVariantsForSelectedProducts);
+    document.getElementById('productIds').addEventListener('change', () => {
+        loadVariantsForSelectedProducts().catch(error => showAlert(error.message, 'danger'));
+    });
     document.getElementById('voucherForm').addEventListener('submit', handleSubmit);
 }
 
@@ -71,8 +79,8 @@ function detectEditMode() {
 
 async function loadScopeOptions() {
     const [brands, categories, products] = await Promise.all([
-        getJson('/api/admin/brands'),
-        getJson('/api/admin/categories'),
+        getJson('/api/admin/brands?includeInactive=true'),
+        getJson('/api/admin/categories?includeInactive=true'),
         loadAllProducts()
     ]);
     fillSelect('brandIds', brands, item => item.name || `Thương hiệu #${item.id}`);
@@ -86,20 +94,23 @@ async function loadAllProducts() {
     let page = 0;
     let totalPages = 1;
     while (page < totalPages && page < 50) {
-        const payload = await getJson(`/api/admin/products?page=${page}&size=100&includeInactive=false`);
+        const payload = await getJson(`/api/admin/products?page=${page}&size=100&includeInactive=true`);
         products.push(...(payload.content || []));
         totalPages = Number(payload.totalPages || 0);
         page += 1;
     }
+    if (page < totalPages) throw new Error('Catalog vượt giới hạn tải. Chưa thể chỉnh sửa phạm vi voucher an toàn.');
     return products;
 }
 
 async function loadVariantsForSelectedProducts() {
+    const request = ++variantOptionsRequest;
     const select = document.getElementById('variantIds');
     const preserved = selectedIds(select);
-    select.replaceChildren();
     const productIds = selectedIds(document.getElementById('productIds'));
-    const responses = await Promise.all(productIds.map(id => getJson(`/api/admin/products/${id}/variants`)));
+    const responses = await Promise.all(productIds.map(id => getJson(`/api/admin/products/${id}/variants?includeInactive=true`)));
+    if (request !== variantOptionsRequest) return;
+    select.replaceChildren();
     responses.flat().forEach(variant => appendVariantOption(variant));
     setSelected(select, preserved);
 }
@@ -125,7 +136,7 @@ function fillSelect(id, values, label) {
     values.forEach(value => {
         const option = document.createElement('option');
         option.value = String(value.id);
-        option.textContent = label(value);
+        option.textContent = `${label(value)}${value.active === false ? ' (đã ẩn)' : ''}`;
         select.appendChild(option);
     });
 }
@@ -156,6 +167,8 @@ async function loadVoucherData(id) {
 
 async function handleSubmit(event) {
     event.preventDefault();
+    if (!formReady || submitting) return;
+    if (!document.getElementById('voucherForm').reportValidity()) return;
     const startDate = document.getElementById('startDate').value;
     const endDate = document.getElementById('endDate').value;
     if (!startDate || !endDate || new Date(endDate) <= new Date(startDate)) {
@@ -190,6 +203,7 @@ async function handleSubmit(event) {
         variantIds: selectedIds(document.getElementById('variantIds'))
     };
     const button = document.getElementById('submitBtn');
+    submitting = true;
     button.disabled = true;
     button.textContent = 'Đang xử lý…';
     try {
@@ -199,6 +213,7 @@ async function handleSubmit(event) {
         showAlert(isEditMode ? 'Đã cập nhật mã giảm giá.' : 'Đã tạo mã giảm giá.', 'success');
         setTimeout(() => { location.href = '/admin/vouchers'; }, 900);
     } catch (error) {
+        submitting = false;
         showAlert(error.message || 'Không thể lưu mã giảm giá.', 'danger');
         button.disabled = false;
         button.textContent = isEditMode ? 'Cập nhật' : 'Lưu mã giảm giá';

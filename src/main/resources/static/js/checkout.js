@@ -1,5 +1,6 @@
 // Checkout functionality
 let checkoutCartState = { totalItems: 0, unavailableItems: 0 };
+let checkoutRequestPending = false;
 
 document.addEventListener('DOMContentLoaded', function() {
     loadCheckoutData();
@@ -11,6 +12,8 @@ document.addEventListener('DOMContentLoaded', function() {
 async function loadCheckoutData() {
     const summaryLoading = document.getElementById('summaryLoading');
     const orderItemsList = document.getElementById('orderItemsList');
+    checkoutCartState = {totalItems: 0, unavailableItems: 0};
+    updateCheckoutAvailability(0, 0);
 
     try {
         const token = localStorage.getItem('authToken') || localStorage.getItem('token');
@@ -46,6 +49,7 @@ async function loadCheckoutData() {
 
         // Hiển thị cả dòng không khả dụng để người mua biết vì sao nó bị loại.
         displayCheckoutItems(cart.items);
+        await refreshCheckoutVoucher(headers);
         updateCheckoutSummary(cart);
         updateCheckoutAvailability(unavailableItems, checkoutCartState.totalItems);
 
@@ -54,6 +58,8 @@ async function loadCheckoutData() {
 
     } catch (error) {
         console.error('Error loading checkout data:', error);
+        checkoutCartState = {totalItems: 0, unavailableItems: 0};
+        updateCheckoutAvailability(0, 0);
         summaryLoading.innerHTML = `
             <div class="alert alert-danger">
                 <i class="fas fa-exclamation-circle me-2"></i>
@@ -76,10 +82,11 @@ async function loadUserProfile(token) {
             const profile = await response.json();
             
             // Pre-fill form
-            document.getElementById('customerName').value = profile.name || '';
-            document.getElementById('customerEmail').value = profile.email || '';
-            document.getElementById('customerPhone').value = profile.phone || '';
-            document.getElementById('shippingAddress').value = profile.address || '';
+            [['customerName', profile.name], ['customerEmail', profile.email],
+                ['customerPhone', profile.phone], ['shippingAddress', profile.address]].forEach(([id, value]) => {
+                const input = document.getElementById(id);
+                if (input && !input.value) input.value = value || '';
+            });
         }
     } catch (error) {
         console.error('Error loading profile:', error);
@@ -141,11 +148,11 @@ function displayCheckoutItems(items) {
 
 // Update checkout summary
 function updateCheckoutSummary(cart) {
-    const subtotal = cart.totalPrice || 0;
+    const subtotal = Math.max(0, Number(cart.totalPrice) || 0);
     document.getElementById('subtotal').textContent = formatPrice(subtotal);
     const summary = document.getElementById('orderSummaryContainer');
-    const configuredShippingFee = Number(summary?.dataset.shippingFee || 0);
-    const configuredFreeThreshold = Number(summary?.dataset.freeShippingThreshold || 0);
+    const configuredShippingFee = Number(summary?.dataset.shippingFee ?? 30000);
+    const configuredFreeThreshold = Number(summary?.dataset.freeShippingThreshold ?? 500000);
     const thresholdShippingFee = subtotal >= configuredFreeThreshold ? 0 : configuredShippingFee;
     
     // Load voucher info from localStorage
@@ -165,7 +172,7 @@ function updateCheckoutSummary(cart) {
         
         // Calculate final total
         const productDiscount = voucher.freeShipping ? 0 : voucher.discountAmount;
-        const finalTotal = Math.max(0, subtotal - productDiscount + baseShippingFee);
+        const finalTotal = Math.max(0, subtotal - productDiscount) + baseShippingFee;
         document.getElementById('totalAmount').textContent = formatPrice(finalTotal);
     } else {
         // Hide voucher display
@@ -180,7 +187,7 @@ function updateCheckoutAvailability(unavailableItems, totalItems) {
     const canCheckout = Number(totalItems) > 0 && Number(unavailableItems) === 0;
 
     if (placeOrderBtn) {
-        placeOrderBtn.disabled = !canCheckout;
+        placeOrderBtn.disabled = !canCheckout || checkoutRequestPending;
         placeOrderBtn.dataset.availableItems = String(Math.max(0, Number(totalItems) || 0));
     }
     if (!alert) return;
@@ -225,9 +232,13 @@ function setupFormValidation() {
 // Setup checkout button
 function setupCheckoutButton() {
     const placeOrderBtn = document.getElementById('placeOrderBtn');
+    const checkoutForm = document.getElementById('checkoutForm');
     
-    placeOrderBtn.addEventListener('click', async function() {
+    checkoutForm.addEventListener('submit', async function(event) {
+        event.preventDefault();
+        if (checkoutRequestPending) return;
         const form = document.getElementById('checkoutForm');
+        form.querySelectorAll('input:not([type="radio"]), textarea').forEach(input => {input.value = input.value.trim();});
 
         if (checkoutCartState.totalItems <= 0 || checkoutCartState.unavailableItems > 0) {
             showNotification('Vui lòng xử lý các sản phẩm không khả dụng trong giỏ hàng trước khi đặt.', 'warning');
@@ -263,6 +274,7 @@ function setupCheckoutButton() {
         };
 
         // Disable button and show loading
+        checkoutRequestPending = true;
         placeOrderBtn.disabled = true;
         placeOrderBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang xử lý...';
 
@@ -286,7 +298,7 @@ function setupCheckoutButton() {
             }
 
             if (!response.ok) {
-                const error = await response.json();
+                const error = await response.json().catch(() => ({}));
                 throw new Error(error.message || error.error || 'Đặt hàng thất bại');
             }
 
@@ -324,7 +336,7 @@ function setupCheckoutButton() {
             showNotification('Đặt hàng thành công! Đang chuyển hướng...', 'success');
             
             setTimeout(() => {
-                window.location.href = `/order-confirmation/${order.orderNumber}`;
+                window.location.href = `/order-confirmation/${encodeURIComponent(order.orderNumber)}`;
             }, 1500);
 
         } catch (error) {
@@ -332,6 +344,7 @@ function setupCheckoutButton() {
             showNotification(error.message || 'Đặt hàng thất bại. Vui lòng thử lại!', 'danger');
             
             // Re-enable button
+            checkoutRequestPending = false;
             placeOrderBtn.disabled = checkoutCartState.totalItems <= 0
                 || checkoutCartState.unavailableItems > 0;
             placeOrderBtn.innerHTML = '<i class="fas fa-check-circle me-2"></i>Đặt hàng ngay';
@@ -345,9 +358,27 @@ function getStoredVoucherState() {
     const explicitFreeShipping = localStorage.getItem('voucherFreeShipping');
     const type = localStorage.getItem('voucherType');
     const freeShipping = Boolean(code) && (explicitFreeShipping === 'true'
-        || type === 'FREE_SHIPPING'
-        || (explicitFreeShipping === null && type === null && discountAmount === 0));
+        || type === 'FREE_SHIPPING');
     return { code, discountAmount, freeShipping };
+}
+
+async function refreshCheckoutVoucher(headers) {
+    const voucher = getStoredVoucherState();
+    if (!voucher.code) return;
+    const response = await fetch(`/api/vouchers/validate?${new URLSearchParams({code: voucher.code})}`, {
+        method: 'POST', headers, credentials: 'same-origin'
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.message || 'Chưa thể kiểm tra mã giảm giá. Vui lòng tải lại trang.');
+    if (!result.valid) {
+        clearStoredCheckoutState();
+        showNotification(result.message || 'Mã giảm giá không còn phù hợp và đã được gỡ.', 'warning');
+        return;
+    }
+    localStorage.setItem('voucherCode', result.voucherCode || voucher.code);
+    localStorage.setItem('voucherDiscount', String(Math.max(0, Number(result.discountAmount) || 0)));
+    localStorage.setItem('voucherType', result.discountType || 'DISCOUNT');
+    localStorage.setItem('voucherFreeShipping', String(result.discountType === 'FREE_SHIPPING'));
 }
 
 function clearStoredCheckoutState() {
@@ -369,6 +400,7 @@ function showNotification(message, type = 'success') {
     toastDiv.className = `alert alert-${type} position-fixed top-0 start-50 translate-middle-x mt-3`;
     toastDiv.style.zIndex = '9999';
     toastDiv.style.minWidth = '300px';
+    toastDiv.setAttribute('role', 'status');
     const icon = document.createElement('i');
     icon.className = `fas fa-${type === 'success' ? 'check-circle' : type === 'warning' ? 'exclamation-triangle' : 'exclamation-circle'} me-2`;
     toastDiv.append(icon, document.createTextNode(String(message ?? '')));
