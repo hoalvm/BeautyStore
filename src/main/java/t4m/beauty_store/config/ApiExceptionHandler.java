@@ -111,6 +111,12 @@ public class ApiExceptionHandler {
             "Đã xảy ra lỗi hệ thống", Map.of(), request);
     }
 
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    ResponseEntity<ApiErrorResponse> uploadTooLarge(Exception exception, HttpServletRequest request) {
+        return response(HttpStatus.PAYLOAD_TOO_LARGE, "UPLOAD_TOO_LARGE",
+            "Tệp tải lên vượt quá dung lượng cho phép", Map.of(), request);
+    }
+
     private ResponseEntity<ApiErrorResponse> response(HttpStatus status, String code, String message,
             Map<String, String> fields, HttpServletRequest request) {
         Object trace = request.getAttribute(RequestTraceFilter.TRACE_ATTRIBUTE);

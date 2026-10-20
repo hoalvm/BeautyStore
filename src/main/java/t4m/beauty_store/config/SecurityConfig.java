@@ -101,6 +101,8 @@ public class SecurityConfig {
                         // Public catalog is read-only. Legacy remote-image mutation stays admin-only.
                         .requestMatchers("/api/products/admin/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
+                        // Each image request is authorized by DeliveryProofAccessService.
+                        .requestMatchers(HttpMethod.GET, "/api/delivery-proofs/*").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/chatbot/message").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/chatbot/health").permitAll()
 
