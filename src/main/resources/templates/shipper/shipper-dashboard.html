@@ -594,6 +594,34 @@
     </div>
 </div>
 
+<!-- Delivery proof is submitted together with the successful delivery transition. -->
+<div class="modal fade" id="deliveryProofModal" tabindex="-1" aria-labelledby="deliveryProofTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content" id="deliveryProofForm">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deliveryProofTitle">Xác nhận giao hàng</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <div class="modal-body">
+                <p id="deliveryProofOrder" class="fw-semibold"></p>
+                <p>Chỉ xác nhận sau khi khách đã nhận hàng và bạn đã thu đủ tiền nếu thanh toán COD.</p>
+                <label for="deliveryProofFile" class="form-label">Ảnh bằng chứng giao hàng <span aria-hidden="true">*</span></label>
+                <input type="file" class="form-control" id="deliveryProofFile" name="image"
+                       accept="image/jpeg,image/png,image/webp" required aria-describedby="deliveryProofHelp deliveryProofStatus">
+                <p id="deliveryProofHelp" class="form-text">
+                    Chọn 1 ảnh JPEG, PNG hoặc WebP, tối đa 5 MB. Chụp kiện hàng tại nơi giao;
+                    tránh khuôn mặt, giấy tờ và thông tin riêng tư của khách.
+                </p>
+                <p id="deliveryProofStatus" role="status" aria-live="polite" class="mb-0"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="submit" class="btn btn-success" id="deliveryProofSubmit">Gửi ảnh &amp; hoàn thành</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- Order Detail Modal -->
 <div class="modal fade" id="orderDetailModal" tabindex="-1">
     <div class="modal-dialog modal-xl">

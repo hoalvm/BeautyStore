@@ -58,6 +58,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Initialize dashboard
+    initializeDeliveryProofForm();
     loadDashboardStats();
     loadAvailableOrders();
     
@@ -657,39 +658,76 @@ async function acceptOrder(orderId) {
     }
 }
 
-// Complete order (SHIPPING -> DELIVERED)
-async function completeOrder(orderId) {
-    if (!safeDeliveryId(orderId) || pendingDeliveryUpdates.has(orderId)) return;
-    if (!confirm('Xác nhận đã giao hàng thành công?')) {
+const deliveryProofState = {orderId: null, busy: false};
+
+function initializeDeliveryProofForm() {
+    const modal = document.getElementById('deliveryProofModal');
+    document.getElementById('deliveryProofForm').addEventListener('submit', submitDeliveryProof);
+    modal.addEventListener('hide.bs.modal', event => {
+        if (deliveryProofState.busy) event.preventDefault();
+    });
+    modal.addEventListener('hidden.bs.modal', () => {
+        deliveryProofState.orderId = null;
+        document.getElementById('deliveryProofForm').reset();
+        document.getElementById('deliveryProofStatus').textContent = '';
+    });
+    modal.addEventListener('shown.bs.modal', () => document.getElementById('deliveryProofFile').focus());
+}
+
+function completeOrder(orderId) {
+    if (!safeDeliveryId(orderId) || pendingDeliveryUpdates.has(orderId) || deliveryProofState.busy) return;
+    deliveryProofState.orderId = orderId;
+    document.getElementById('deliveryProofForm').reset();
+    document.getElementById('deliveryProofStatus').textContent = '';
+    document.getElementById('deliveryProofOrder').textContent = `Đơn hàng #${orderId}`;
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('deliveryProofModal')).show();
+}
+
+async function submitDeliveryProof(event) {
+    event.preventDefault();
+    const orderId = deliveryProofState.orderId;
+    if (!orderId || deliveryProofState.busy || pendingDeliveryUpdates.has(orderId)) return;
+    const form = document.getElementById('deliveryProofForm');
+    if (!form.reportValidity()) return;
+    const image = document.getElementById('deliveryProofFile').files[0];
+    if (!image) return;
+    const status = document.getElementById('deliveryProofStatus');
+    const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+    if (!token) {
+        status.textContent = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
         return;
     }
-    
-    const token = localStorage.getItem('authToken') || localStorage.getItem('token');
-    if (!token) return;
-
+    const body = new FormData();
+    body.append('image', image);
+    deliveryProofState.busy = true;
+    form.setAttribute('aria-busy', 'true');
+    form.querySelectorAll('button, input').forEach(control => { control.disabled = true; });
+    status.textContent = 'Đang gửi ảnh và xác nhận giao hàng…';
     setDeliveryBusy(orderId, true);
+    let completed = false;
     try {
         const response = await fetch(`/api/shipper/orders/${orderId}/complete`, {
             method: 'PUT',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-            }
+            headers: {'Authorization': `Bearer ${token}`},
+            body
         });
-
         if (response.ok) {
-            showToast('Đã hoàn thành giao hàng!', 'success');
-            // Refresh data
+            completed = true;
+            showToast('Đã lưu ảnh và hoàn thành giao hàng!', 'success');
             loadDashboardStats();
             loadActiveOrders();
         } else {
-            const error = await response.json();
-            showToast(error.message || error.error || 'Không thể hoàn thành đơn hàng', 'danger');
+            const error = await response.json().catch(() => ({}));
+            status.textContent = error.message || 'Không thể hoàn thành đơn hàng. Vui lòng thử lại.';
         }
-    } catch (error) {
-        console.error('Error completing order:', error);
-        showToast('Lỗi kết nối', 'danger');
+    } catch (_) {
+        status.textContent = 'Mất kết nối. Ảnh đã chọn được giữ lại; bạn có thể gửi lại an toàn.';
     } finally {
+        deliveryProofState.busy = false;
+        form.setAttribute('aria-busy', 'false');
+        form.querySelectorAll('button, input').forEach(control => { control.disabled = false; });
         setDeliveryBusy(orderId, false);
+        if (completed) bootstrap.Modal.getOrCreateInstance(document.getElementById('deliveryProofModal')).hide();
     }
 }
 
