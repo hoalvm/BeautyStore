@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import t4m.beauty_store.auth.dto.RegisterRequest;
 import t4m.beauty_store.auth.dto.UpdateProfileRequest;
 import t4m.beauty_store.auth.dto.UserProfileResponse;
@@ -22,6 +23,8 @@ import lombok.RequiredArgsConstructor;
 import jakarta.annotation.PostConstruct;
 
 import java.util.List;
+import java.util.Locale;
+import java.util.Comparator;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -54,9 +57,10 @@ public class UserService {
      * All registrations are forced to ROLE_USER. Other roles must be created by admin.
      * Sends OTP for account activation.
      */
+    @Transactional
     public void register(RegisterRequest dto) {
         PasswordPolicy.requireStrong(dto.getPassword());
-        String sanitizedEmail = dto.getEmail().trim().toLowerCase();
+        String sanitizedEmail = dto.getEmail().trim().toLowerCase(Locale.ROOT);
         // Force all public registrations to ROLE_USER only
         String sanitizedRole = "ROLE_USER";
 
@@ -89,11 +93,11 @@ public class UserService {
      * Send OTP for account activation.
      */
     public void sendActivationOtp(String email) {
-        String sanitizedEmail = email.trim().toLowerCase();
+        String sanitizedEmail = email.trim().toLowerCase(Locale.ROOT);
         logger.info("Processing an activation OTP request");
 
         User user = userRepository.findByEmail(sanitizedEmail).orElse(null);
-        if (user == null || user.isActivated()) {
+        if (user == null || user.isActivated() || user.isAccountLocked()) {
             logger.info("Activation OTP request completed without a deliverable challenge");
             return;
         }
@@ -104,8 +108,9 @@ public class UserService {
     /**
      * Verify OTP and activate account.
      */
+    @Transactional
     public void verifyOtpAndActivate(String email, String otp) {
-        String sanitizedEmail = email.trim().toLowerCase();
+        String sanitizedEmail = email.trim().toLowerCase(Locale.ROOT);
         logger.info("Processing account activation");
 
         User user = userRepository.findByEmail(sanitizedEmail)
@@ -114,6 +119,9 @@ public class UserService {
                     return new UserNotFoundException("User not found");
                 });
 
+        if (user.isAccountLocked()) {
+            throw new AccountNotActivatedException("Tài khoản đang bị khóa; vui lòng liên hệ hỗ trợ");
+        }
         if (user.isActivated()) {
             logger.warn("Activation rejected because the account is already active");
             throw new AccountNotActivatedException("Account already activated");
@@ -134,7 +142,7 @@ public class UserService {
      * Login user and generate JWT.
      */
     public String login(String email, String password) {
-        String sanitizedEmail = email.trim().toLowerCase();
+        String sanitizedEmail = email.trim().toLowerCase(Locale.ROOT);
         logger.info("Processing a login request");
 
         User user = userRepository.findByEmail(sanitizedEmail).orElse(null);
@@ -149,17 +157,17 @@ public class UserService {
             throw new InvalidCredentialsException("Invalid email or password");
         }
 
+        if (user.isAccountLocked()) {
+            throw new InvalidCredentialsException("Invalid email or password");
+        }
         if (!user.isActivated()) {
             logger.warn("Login rejected because the account is not active");
             throw new AccountNotActivatedException("Account not activated");
         }
 
         try {
-            String role = user.getRoles().stream()
-                    .map(Role::getRname)
-                    .findFirst()
-                    .orElseThrow(() -> new InvalidRoleException("No role assigned to user"));
-            String token = jwtUtil.generateToken(sanitizedEmail, Set.of(role), user.getAuthVersion());
+            String role = primaryRole(user);
+            String token = jwtUtil.generateToken(sanitizedEmail, Set.of(role), user.getAuthVersion(), user.getId());
             logger.info("Login completed successfully");
             return token;
         } catch (Exception e) {
@@ -172,14 +180,24 @@ public class UserService {
      * Get user role.
      */
     public String getUserRole(String email) {
-        String sanitizedEmail = email.trim().toLowerCase();
+        String sanitizedEmail = email.trim().toLowerCase(Locale.ROOT);
         User user = userRepository.findByEmail(sanitizedEmail)
                 .orElseThrow(() -> {
                     logger.warn("Role lookup rejected because the account does not exist");
                     return new UserNotFoundException("User not found");
                 });
+        return primaryRole(user);
+    }
+
+    private static String primaryRole(User user) {
         return user.getRoles().stream()
                 .map(Role::getRname)
+                .sorted(Comparator.comparingInt(role -> switch (role) {
+                    case "ROLE_ADMIN" -> 0;
+                    case "ROLE_SHIPPER" -> 1;
+                    case "ROLE_USER" -> 2;
+                    default -> 3;
+                }))
                 .findFirst()
                 .orElseThrow(() -> new InvalidRoleException("No role assigned to user"));
     }
@@ -188,7 +206,7 @@ public class UserService {
      * Send OTP for password reset.
      */
     public void sendForgotPasswordOtp(String email) {
-        String sanitizedEmail = email.trim().toLowerCase();
+        String sanitizedEmail = email.trim().toLowerCase(Locale.ROOT);
         logger.info("Processing a password-reset OTP request");
 
         User user = userRepository.findByEmail(sanitizedEmail).orElse(null);
@@ -203,9 +221,10 @@ public class UserService {
     /**
      * Reset password with OTP.
      */
+    @Transactional
     public void resetPassword(String email, String otp, String newPassword) {
         PasswordPolicy.requireStrong(newPassword);
-        String sanitizedEmail = email.trim().toLowerCase();
+        String sanitizedEmail = email.trim().toLowerCase(Locale.ROOT);
         logger.info("Processing a password reset");
 
         User user = userRepository.findByEmail(sanitizedEmail)
@@ -228,7 +247,7 @@ public class UserService {
      * Get user profile information.
      */
     public UserProfileResponse getUserProfile(String email) {
-        String sanitizedEmail = email.trim().toLowerCase();
+        String sanitizedEmail = email.trim().toLowerCase(Locale.ROOT);
         logger.debug("Fetching the authenticated customer profile");
 
         User user = userRepository.findByEmail(sanitizedEmail)
@@ -247,8 +266,9 @@ public class UserService {
     /**
      * Update user profile information.
      */
+    @Transactional
     public void updateUserProfile(String email, UpdateProfileRequest dto) {
-        String sanitizedEmail = email.trim().toLowerCase();
+        String sanitizedEmail = email.trim().toLowerCase(Locale.ROOT);
         logger.info("Processing an authenticated profile update");
 
         User user = userRepository.findByEmail(sanitizedEmail)
@@ -268,9 +288,10 @@ public class UserService {
      * Change user password.
      * Validates current password before updating to new password.
      */
+    @Transactional
     public void changePassword(String email, String currentPassword, String newPassword) {
         PasswordPolicy.requireStrong(newPassword);
-        String sanitizedEmail = email.trim().toLowerCase();
+        String sanitizedEmail = email.trim().toLowerCase(Locale.ROOT);
         logger.info("Processing an authenticated password change");
 
         User user = userRepository.findByEmail(sanitizedEmail)

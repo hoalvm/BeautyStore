@@ -24,5 +24,5 @@ public class AccountCreateRequest {
     private String phone;
 
     @NotBlank(message = "Vai trò không được để trống")
-    private String role; // "USER" or "SHIPPER"
+    private String role; // ROLE_USER, ROLE_SHIPPER or ROLE_ADMIN
 }

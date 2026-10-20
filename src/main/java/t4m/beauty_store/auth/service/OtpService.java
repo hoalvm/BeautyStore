@@ -16,6 +16,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 public class OtpService {
@@ -46,11 +47,18 @@ public class OtpService {
         String challengeId = storeOtp(email, otp, purpose);
         String action = "activation".equalsIgnoreCase(purpose)
                 ? "đăng ký tài khoản" : "đặt lại mật khẩu";
-        CompletableFuture<Void> delivery = emailService.sendOtpEmail(email, otp, action);
-        if (delivery != null) {
+        try {
+            CompletableFuture<Void> delivery = emailService.sendOtpEmail(email, otp, action);
+            if (delivery == null) {
+                invalidateChallenge(email, purpose, challengeId);
+                return;
+            }
             delivery.whenComplete((ignored, error) -> {
                 if (error != null) invalidateChallenge(email, purpose, challengeId);
             });
+        } catch (RuntimeException exception) {
+            invalidateChallenge(email, purpose, challengeId);
+            throw exception;
         }
     }
 
@@ -79,16 +87,26 @@ public class OtpService {
 
     public void validateOtp(String email, String otp, String purpose) {
         String key = cacheKey(email, purpose);
-        OtpData data = otpCache.getIfPresent(key);
-        if (data == null) throw new OtpExpiredException("Mã OTP không tồn tại hoặc đã hết hạn");
-        if (otp == null || !passwordEncoder.matches(otp, data.otpHash)) {
-            if (data.failedAttempts.incrementAndGet() >= MAX_VERIFICATION_ATTEMPTS) {
-                otpCache.invalidate(key);
-                throw new OtpRateLimitException("Bạn đã nhập sai OTP quá nhiều lần. Vui lòng yêu cầu mã mới");
+        AtomicReference<RuntimeException> failure = new AtomicReference<>();
+        // Verify and consume while holding the cache's per-key lock. A second
+        // concurrent request must not validate the same one-time challenge.
+        otpCache.asMap().compute(key, (ignored, data) -> {
+            if (data == null) {
+                failure.set(new OtpExpiredException("Mã OTP không tồn tại hoặc đã hết hạn"));
+                return null;
             }
-            throw new OtpInvalidException("Mã OTP không chính xác");
-        }
-        otpCache.invalidate(key);
+            if (otp == null || !otp.matches("\\d{6}") || !passwordEncoder.matches(otp, data.otpHash)) {
+                if (data.failedAttempts.incrementAndGet() >= MAX_VERIFICATION_ATTEMPTS) {
+                    failure.set(new OtpRateLimitException(
+                        "Bạn đã nhập sai OTP quá nhiều lần. Vui lòng yêu cầu mã mới"));
+                    return null;
+                }
+                failure.set(new OtpInvalidException("Mã OTP không chính xác"));
+                return data;
+            }
+            return null;
+        });
+        if (failure.get() != null) throw failure.get();
         log.debug("OTP challenge validated for purpose {}", normalizePurpose(purpose));
     }
 
@@ -103,11 +121,11 @@ public class OtpService {
 
     private void invalidateChallenge(String email, String purpose, String challengeId) {
         String key = cacheKey(email, purpose);
-        OtpData current = otpCache.getIfPresent(key);
-        if (current != null && current.challengeId.equals(challengeId)) {
-            otpCache.invalidate(key);
+        otpCache.asMap().computeIfPresent(key, (ignored, current) -> {
+            if (!current.challengeId.equals(challengeId)) return current;
             log.warn("Invalidated an OTP challenge after email delivery failed");
-        }
+            return null;
+        });
     }
 
     private String cacheKey(String email, String purpose) {

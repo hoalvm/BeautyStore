@@ -47,6 +47,14 @@ public class User implements UserDetails {
     @Column(name = "auth_version", nullable = false)
     private int authVersion = 0;
 
+    /** Administrative suspension is distinct from an unverified registration. */
+    @Column(name = "account_locked", nullable = false)
+    private boolean accountLocked = false;
+
+    @Version
+    @Column(name = "row_version", nullable = false)
+    private long rowVersion = 0;
+
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(name = "user_role", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "role_id"))
     private Set<Role> roles = new HashSet<>();
@@ -69,5 +77,10 @@ public class User implements UserDetails {
     @Override
     public boolean isEnabled() {
         return activated;
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return !accountLocked;
     }
 }

@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -84,6 +85,13 @@ public class ApiExceptionHandler {
             DataIntegrityViolationException exception, HttpServletRequest request) {
         return response(HttpStatus.CONFLICT, "DATA_CONFLICT",
             "Dữ liệu bị trùng hoặc đang được tài nguyên khác sử dụng", Map.of(), request);
+    }
+
+    @ExceptionHandler({OptimisticLockingFailureException.class, jakarta.persistence.OptimisticLockException.class})
+    ResponseEntity<ApiErrorResponse> staleUpdate(
+            Exception exception, HttpServletRequest request) {
+        return response(HttpStatus.CONFLICT, "STALE_UPDATE",
+            "Dữ liệu vừa được cập nhật. Vui lòng tải lại và thử lại", Map.of(), request);
     }
 
     @ExceptionHandler(ResponseStatusException.class)

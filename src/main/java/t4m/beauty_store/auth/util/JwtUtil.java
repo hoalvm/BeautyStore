@@ -33,9 +33,14 @@ public class JwtUtil {
     }
 
     public String generateToken(String username, Set<String> roles, int authVersion) {
+        return generateToken(username, roles, authVersion, null);
+    }
+
+    public String generateToken(String username, Set<String> roles, int authVersion, Long userId) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("roles", roles);
         claims.put("authVersion", authVersion);
+        if (userId != null) claims.put("userId", userId);
         long now = System.currentTimeMillis();
         return Jwts.builder()
                 .claims(claims)
@@ -64,11 +69,19 @@ public class JwtUtil {
     }
 
     public boolean isTokenValid(String token, String username, int expectedAuthVersion) {
+        return isTokenValid(token, username, expectedAuthVersion, null);
+    }
+
+    public boolean isTokenValid(String token, String username, int expectedAuthVersion, Long expectedUserId) {
         final String extractedUsername = extractUsername(token);
         Integer tokenVersion = extractClaim(token, claims -> claims.get("authVersion", Integer.class));
+        Long tokenUserId = extractClaim(token, claims -> claims.get("userId", Long.class));
         int normalizedVersion = tokenVersion == null ? 0 : tokenVersion;
         return extractedUsername.equals(username)
                 && normalizedVersion == expectedAuthVersion
+                // Legacy tokens remain valid until expiration; newly issued tokens
+                // cannot follow an email address reassigned to a different account.
+                && (tokenUserId == null || tokenUserId.equals(expectedUserId))
                 && !isTokenExpired(token);
     }
 

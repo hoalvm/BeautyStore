@@ -11,7 +11,6 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -19,6 +18,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import t4m.beauty_store.auth.service.CustomUserDetailsService;
+import t4m.beauty_store.auth.service.CompatiblePasswordEncoder;
 import t4m.beauty_store.auth.util.JwtRequestFilter;
 
 import java.util.Arrays;
@@ -50,7 +50,7 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(12);
+        return new CompatiblePasswordEncoder(12);
     }
 
     @Bean
@@ -81,9 +81,11 @@ public class SecurityConfig {
                         .requestMatchers("/shipper", "/shipper/**").hasRole("SHIPPER")
 
                         // Static resources
-                        .requestMatchers("/css/**", "/js/**", "/images/**", "/fonts/**", "/favicon.ico",
+                        .requestMatchers("/css/**", "/js/**", "/images/**", "/fonts/**", "/vendor/**", "/favicon.ico",
                                 "/robots.txt", "/sitemap.xml", "/error")
                         .permitAll()
+                        // Controllers exist exclusively in the loopback-only demo profile.
+                        .requestMatchers(HttpMethod.GET, "/demo", "/demo/**").permitAll()
 
                         // Only authentication bootstrap/OTP operations are anonymous.
                         .requestMatchers(HttpMethod.POST,
@@ -135,9 +137,6 @@ public class SecurityConfig {
                         .requestMatchers("/api/favorites/**").authenticated()
                         .requestMatchers("/api/user/**").authenticated()
                         .requestMatchers("/api/support/**").authenticated()
-
-                        // Vendor API endpoints
-                        .requestMatchers("/api/vendor/**").hasRole("VENDOR")
 
                         // Shipper API endpoints
                         .requestMatchers("/api/shipper/**").hasRole("SHIPPER")

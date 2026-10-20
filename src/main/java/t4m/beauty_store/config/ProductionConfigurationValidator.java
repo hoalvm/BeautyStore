@@ -6,14 +6,18 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
+import java.util.Set;
 
 /** Stops production startup when security-critical or legal configuration is missing. */
 @Component
 @Profile("prod")
 public class ProductionConfigurationValidator implements InitializingBean {
+    private static final Set<String> PUBLIC_DEVELOPMENT_KEYS = Set.of(
+        "beautystore-local-demo-only-not-for-production-2026",
+        "beautystore-test-secret-key-that-is-never-used-in-production");
 
     private final String jwtSecret;
     private final VNPayConfig vnPayConfig;
@@ -31,8 +35,9 @@ public class ProductionConfigurationValidator implements InitializingBean {
     @Override
     public void afterPropertiesSet() {
         List<String> missingOrInvalid = new ArrayList<>();
-        if (jwtSecret == null || jwtSecret.getBytes(StandardCharsets.UTF_8).length < 32) {
-            missingOrInvalid.add("security.jwt.secret (minimum 32 bytes)");
+        if (isBlank(jwtSecret) || jwtSecret.getBytes(StandardCharsets.UTF_8).length < 32
+                || PUBLIC_DEVELOPMENT_KEYS.contains(jwtSecret.strip())) {
+            missingOrInvalid.add("security.jwt.secret (private key, minimum 32 bytes)");
         }
         if (!vnPayConfig.isConfigured()) {
             missingOrInvalid.add("vnpay.tmn-code/vnpay.hash-secret");
@@ -65,6 +70,15 @@ public class ProductionConfigurationValidator implements InitializingBean {
     }
 
     private boolean isHttps(String value) {
-        return value != null && value.strip().toLowerCase(Locale.ROOT).startsWith("https://");
+        if (isBlank(value)) return false;
+        try {
+            URI uri = URI.create(value.strip());
+            return "https".equalsIgnoreCase(uri.getScheme())
+                && uri.getHost() != null && !uri.getHost().isBlank()
+                && uri.getRawUserInfo() == null && uri.getRawFragment() == null
+                && uri.getPort() >= -1 && uri.getPort() <= 65535;
+        } catch (IllegalArgumentException invalidUri) {
+            return false;
+        }
     }
 }

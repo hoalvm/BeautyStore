@@ -58,4 +58,23 @@ class JwtUtilTests {
         assertThat(jwt.isTokenValid(token, "customer@example.test", 3)).isTrue();
         assertThat(jwt.isTokenValid(token, "customer@example.test", 4)).isFalse();
     }
+
+    @Test
+    void boundTokenCannotAuthenticateAnotherAccountReusingSameEmail() {
+        JwtUtil jwt = new JwtUtil(SECRET, Duration.ofMinutes(5));
+        String token = jwt.generateToken("customer@example.test", Set.of("ROLE_USER"), 0, 7L);
+
+        assertThat(jwt.isTokenValid(token, "customer@example.test", 0, 7L)).isTrue();
+        assertThat(jwt.isTokenValid(token, "customer@example.test", 0, 8L)).isFalse();
+        assertThat(jwt.isTokenValid(token, "customer@example.test", 0)).isFalse();
+    }
+
+    @Test
+    void legacyTokensRemainValidWithAccountIdentityAndVersionCheck() {
+        JwtUtil jwt = new JwtUtil(SECRET, Duration.ofMinutes(5));
+        String token = jwt.generateToken("customer@example.test", Set.of("ROLE_USER"), 0);
+
+        assertThat(jwt.isTokenValid(token, "customer@example.test", 0, 7L)).isTrue();
+        assertThat(jwt.isTokenValid(token, "customer@example.test", 1, 7L)).isFalse();
+    }
 }

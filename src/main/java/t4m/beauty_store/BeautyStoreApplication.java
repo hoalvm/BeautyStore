@@ -37,7 +37,7 @@ public class BeautyStoreApplication {
     @Order(1)
     public ApplicationRunner initRoles(RoleRepository roleRepository) {
         return args -> {
-            List<String> roleNames = List.of("ROLE_USER", "ROLE_VENDOR", "ROLE_SHIPPER", "ROLE_ADMIN");
+            List<String> roleNames = List.of("ROLE_USER", "ROLE_SHIPPER", "ROLE_ADMIN");
 
             for (String roleName : roleNames) {
                 if (roleRepository.findByRname(roleName).isEmpty()) {
@@ -52,7 +52,7 @@ public class BeautyStoreApplication {
 
     @Bean
     @Order(2)
-    @Profile({"dev", "test"})
+    @Profile({"demo", "dev", "test"})
     public ApplicationRunner initAdminUser(UserRepository userRepository,
                                            RoleRepository roleRepository,
                                            PasswordEncoder passwordEncoder) {
@@ -67,7 +67,7 @@ public class BeautyStoreApplication {
                     .orElseThrow(() -> new IllegalStateException("ROLE_ADMIN must be initialized first"));
             User adminUser = createDemoUser(
                     adminEmail,
-                    passwordEncoder.encode("admin123"),
+                    passwordEncoder.encode("BeautyAdmin123!"),
                     "BeautyStore Administrator",
                     "0123456789",
                     "Văn phòng BeautyStore"
@@ -80,7 +80,7 @@ public class BeautyStoreApplication {
 
     @Bean
     @Order(3)
-    @Profile({"dev", "test"})
+    @Profile({"demo", "dev", "test"})
     public ApplicationRunner initShipperUsers(UserRepository userRepository,
                                               RoleRepository roleRepository,
                                               PasswordEncoder passwordEncoder) {
@@ -95,7 +95,7 @@ public class BeautyStoreApplication {
                     .orElseThrow(() -> new IllegalStateException("ROLE_SHIPPER must be initialized first"));
             User shipper = createDemoUser(
                     shipperEmail,
-                    passwordEncoder.encode("shipper123"),
+                    passwordEncoder.encode("BeautyShipper123!"),
                     "BeautyStore Shipper",
                     "0123456789",
                     "Kho vận BeautyStore, TP. Hồ Chí Minh"
@@ -108,7 +108,7 @@ public class BeautyStoreApplication {
 
     @Bean
     @Order(4)
-    @Profile({"dev", "test"})
+    @Profile({"demo", "dev", "test"})
     public ApplicationRunner initRegularUsers(UserRepository userRepository,
                                               RoleRepository roleRepository,
                                               PasswordEncoder passwordEncoder) {
@@ -123,7 +123,7 @@ public class BeautyStoreApplication {
                     .orElseThrow(() -> new IllegalStateException("ROLE_USER must be initialized first"));
             User demoUser = createDemoUser(
                     userEmail,
-                    passwordEncoder.encode("user123"),
+                    passwordEncoder.encode("BeautyUser123!"),
                     "BeautyStore Demo User",
                     "0123456789",
                     "Quận 3, TP. Hồ Chí Minh"
