@@ -32,7 +32,8 @@ Tài khoản chỉ được tạo khi chưa có vai trò tương ứng; không g
 
 ### Phạm vi demo và dữ liệu
 
-- H2 lưu dữ liệu tại `.beautystore/demo.mv.db`; ảnh upload lưu tại `.beautystore/uploads/`.
+- H2 lưu dữ liệu tại `.beautystore/demo.mv.db`; ảnh catalog/review/đổi trả lưu tại `.beautystore/uploads/`.
+  Riêng ảnh bằng chứng giao hàng lưu riêng tư trong DB, không có URL công khai.
   Thư mục này không vào Git, không bị `mvn clean` xóa. Khởi động lại giữ nguyên đơn/tài khoản.
 - Seed 8 nhóm / 40 sản phẩm hư cấu. Seeder không khôi phục sản phẩm admin đã ẩn.
 - Email được render thật và chuyển vào [hộp thư demo](http://localhost:8080/demo/inbox),
@@ -53,7 +54,9 @@ Không xóa database MySQL đang có.
 1. Khách mở sản phẩm, chọn biến thể → giỏ hàng → nhập địa chỉ → đặt COD.
 2. Khách tra cứu đơn bằng email/OTP trong hộp thư demo; không thể xem đơn chỉ bằng mã đơn.
 3. Admin `/admin` xác nhận đơn, kiểm tra tồn kho, lô, biến thể, voucher và tài khoản.
-4. Shipper `/shipper` nhận đơn khả dụng → giao hàng → xác nhận đã giao.
+4. Shipper `/shipper` nhận đơn khả dụng → giao hàng → chọn 1 ảnh bằng chứng → xem trước
+   → “Gửi ảnh & hoàn thành”. Ảnh JPEG/PNG/WebP tối đa 5 MB; chỉ xác nhận khi khách đã nhận
+   hàng và COD đã thu đủ. Khách, admin và shipper được phân công xem ảnh trong chi tiết đơn.
 5. Khách vào đơn đã giao để viết đánh giá hoặc yêu cầu đổi trả.
 6. Admin duyệt đánh giá; xử lý yêu cầu trả, xác nhận hàng đủ điều kiện mới nhập lại lô,
    ghi nhận hoàn tiền thủ công. Luồng hỗ trợ trực tiếp ở widget khách và `/admin/support`.
@@ -61,6 +64,9 @@ Không xóa database MySQL đang có.
 Dùng cửa sổ riêng tư hoặc browser profile riêng cho mỗi vai trò để không ghi đè phiên đăng nhập.
 Các giới hạn chống spam vẫn hoạt động trong demo (OTP, checkout, chatbot); đừng bấm gửi liên tục.
 Phí ship 30.000đ, miễn ship khi tiền hàng sau giá sale đạt 500.000đ.
+
+Chi tiết upload, quyền xem, migration V19 và cách kiểm thử:
+[Bằng chứng giao hàng](docs/DELIVERY_PROOF.md).
 
 ## MySQL và tích hợp thật
 
