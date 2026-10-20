@@ -352,7 +352,7 @@ async function fetchOrder(orderNumber) {
             credentials: 'same-origin',
             cache: 'no-store'
         });
-        if (![401, 403, 404].includes(memberResponse.status) || !guestToken) {
+        if (![400, 401, 403, 404].includes(memberResponse.status) || !guestToken) {
             viewingGuestOrder = false;
             return memberResponse;
         }

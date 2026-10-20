@@ -34,7 +34,9 @@ async function loadOrderDetails() {
                 credentials: 'same-origin'
             });
         }
-        if (guestToken && (!response || [401, 403, 404].includes(response.status))) {
+        // Legacy ownership failures use 400. A separately verified token for
+        // this exact guest order remains valid even after signing into an account.
+        if (guestToken && (!response || [400, 401, 403, 404].includes(response.status))) {
             currentOrderUsesGuestAccess = true;
             response = await fetch(`/api/guest-orders/${encodedOrderNumber}`, {
                 headers: { 'X-Order-Token': guestToken },

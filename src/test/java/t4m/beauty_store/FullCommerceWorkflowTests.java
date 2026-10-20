@@ -100,7 +100,7 @@ class FullCommerceWorkflowTests {
         String number = order.path("orderNumber").asText();
         assertStock(startingStock, 2);
         mvc.perform(get("/api/orders/" + number).with(user(createUser("stranger")).roles("USER")))
-            .andExpect(status().is4xxClientError());
+            .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("ORDER_FORBIDDEN"));
         mvc.perform(put("/api/admin/orders/" + id + "/status")
             .with(user(customer).roles("USER")).contentType(MediaType.APPLICATION_JSON)
             .content("{\"status\":\"PROCESSING\"}")).andExpect(status().isForbidden());

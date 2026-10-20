@@ -37,6 +37,27 @@ test('order access headers use only matching order token',()=>{
     tokens.set('beautystore:order-token:A','matching');
     assert.equal(context.orderAccessHeaders('A')['X-Order-Token'],'matching');
 });
+test('guest receipt still opens after member login despite legacy ownership 400',async()=>{
+    const {context,tokens,nodes}=load();
+    context.window.location={pathname:'/order-confirmation/ORDER-A'};
+    context.localStorage.getItem=()=> 'member-token';
+    tokens.set('beautystore:order-token:ORDER-A','guest-token');
+    const calls=[];
+    context.fetch=async(url,options)=>{
+        calls.push({url,headers:options.headers});
+        return url.startsWith('/api/orders/')
+            ? {status:400,ok:false}
+            : {status:200,ok:true,json:async()=>({orderNumber:'ORDER-A',status:'DELIVERED',paymentMethod:'COD'})};
+    };
+    context.displayOrderDetails=()=>{};
+    context.addCancelButton=()=>{};
+    context.celebrateOrder=()=>{};
+    await context.loadOrderDetails();
+    assert.equal(calls.length,2);
+    assert.equal(calls[1].headers['X-Order-Token'],'guest-token');
+    assert.equal(context.orderAccessHeaders('ORDER-A').Authorization,undefined);
+    assert.equal(nodes.get('orderDetails').style.display,'block');
+});
 test('guest OTP resend respects cooldown, renews challenge and recovers expiry',async()=>{
     const {context,node,advance}=load(); const original=node();
     context.showGuestOtpForm(original,'ORDER','buyer@example.test',node());

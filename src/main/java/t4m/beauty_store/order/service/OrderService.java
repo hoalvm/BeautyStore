@@ -17,6 +17,8 @@ import t4m.beauty_store.cart.repository.CartRepository;
 import t4m.beauty_store.cart.service.CartIdentity;
 import t4m.beauty_store.config.StoreProperties;
 import t4m.beauty_store.config.StoreTime;
+import t4m.beauty_store.config.ApiException;
+import org.springframework.http.HttpStatus;
 import t4m.beauty_store.order.dto.CheckoutRequest;
 import t4m.beauty_store.order.dto.OrderResponse;
 import t4m.beauty_store.order.entity.*;
@@ -203,7 +205,7 @@ public class OrderService {
         Order order = orderRepository.findByOrderNumber(orderNumber)
             .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng"));
         if (order.getUser() == null || !order.getUser().getId().equals(user.getId())) {
-            throw new IllegalArgumentException("Bạn không có quyền xem đơn hàng này");
+            throw new ApiException(HttpStatus.FORBIDDEN, "ORDER_FORBIDDEN", "Bạn không có quyền xem đơn hàng này");
         }
         return OrderResponse.fromEntity(order);
     }
@@ -473,7 +475,7 @@ public class OrderService {
     private void requireOwner(Order order, String email) {
         if (order.getUser() == null || email == null
                 || !order.getUser().getEmail().equalsIgnoreCase(email)) {
-            throw new IllegalArgumentException("Bạn không có quyền thao tác đơn hàng này");
+            throw new ApiException(HttpStatus.FORBIDDEN, "ORDER_FORBIDDEN", "Bạn không có quyền thao tác đơn hàng này");
         }
     }
 
