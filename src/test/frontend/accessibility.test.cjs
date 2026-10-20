@@ -3,6 +3,13 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const read = file => fs.readFileSync(path.join(__dirname, '../../main/resources', file), 'utf8');
+test('category menu hides the scrollbar without disabling horizontal scrolling', () => {
+    const css = read('static/css/style.css');
+    const rule = css.match(/\.category-nav \.navbar-nav\s*\{([^}]+)\}/)[1];
+    assert.match(rule, /overflow-x:\s*auto/);
+    assert.match(rule, /scrollbar-width:\s*none/);
+    assert.match(css, /\.category-nav \.navbar-nav::-webkit-scrollbar\s*\{\s*display:\s*none/);
+});
 test('header search is a keyboard and no-JavaScript compatible form', () => {
     const html = read('templates/fragments/header.html');
     assert.match(html, /<form[^>]*role="search"[^>]*th:action="@\{\/products\}"[^>]*method="get"/);
