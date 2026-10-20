@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Giao vận – BeautyStore</title>
+    <link rel="icon" href="/images/beauty/favicon.svg" type="image/svg+xml">
     <link href="/vendor/bootstrap-5.3.0/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/vendor/fontawesome-6.4.0/css/all.min.css">
 </head>
@@ -513,7 +514,7 @@
                                 <div class="row no-gutters align-items-center">
                                     <div class="col mr-2">
                                         <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                                            Đơn tạo hôm nay đã xử lý
+                                            Giao thành công hôm nay
                                         </div>
                                         <div class="h4 mb-0 font-weight-bold text-gray-800" id="historyTodayCount">0</div>
                                         <small class="text-muted">📅 Hôm nay</small>
@@ -625,14 +626,14 @@
 </div>
 
 <!-- Order Detail Modal -->
-<div class="modal fade" id="orderDetailModal" tabindex="-1">
+<div class="modal fade" id="orderDetailModal" tabindex="-1" aria-labelledby="orderDetailTitle" aria-hidden="true">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title">
+                <h5 class="modal-title" id="orderDetailTitle">
                     <i class="fas fa-file-invoice me-2"></i>Chi tiết đơn hàng
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
             </div>
             <div class="modal-body" id="orderDetailContent">
                 <div class="text-center py-5">

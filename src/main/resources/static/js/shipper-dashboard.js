@@ -556,13 +556,7 @@ function updateHistoryStats(orders) {
     const failedCount = orders.filter(o => o.status === 'FAILED').length;
     
     // Count today's deliveries
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayCount = orders.filter(o => {
-        const orderDate = new Date(o.createdAt);
-        orderDate.setHours(0, 0, 0, 0);
-        return orderDate.getTime() === today.getTime() && (o.status === 'DELIVERED' || o.status === 'FAILED');
-    }).length;
+    const todayCount = orders.filter(isDeliveredToday).length;
     
     document.getElementById('historyTotalCount').textContent = totalCount;
     document.getElementById('historyTodayCount').textContent = todayCount;
@@ -581,14 +575,8 @@ function filterHistory(status) {
     } else if (status === 'FAILED') {
         filteredOrders = allHistoryOrders.filter(order => order.status === 'FAILED');
     } else if (status === 'TODAY') {
-        // Filter today's deliveries (both success and failed)
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        filteredOrders = allHistoryOrders.filter(order => {
-            const orderDate = new Date(order.deliveredAt || order.createdAt);
-            orderDate.setHours(0, 0, 0, 0);
-            return orderDate.getTime() === today.getTime() && (order.status === 'DELIVERED' || order.status === 'FAILED');
-        });
+        // Count completed deliveries by actual handover time, not checkout time.
+        filteredOrders = allHistoryOrders.filter(isDeliveredToday);
     }
     // If status === 'ALL', show all orders
     
@@ -597,6 +585,11 @@ function filterHistory(status) {
 }
 
 // Display delivery history
+function isDeliveredToday(order) {
+    if (order.status !== 'DELIVERED' || !order.deliveredAt) return false;
+    return new Date(order.deliveredAt).toDateString() === new Date().toDateString();
+}
+
 function displayHistory(orders) {
     const tableBody = document.getElementById('historyTable');
     
