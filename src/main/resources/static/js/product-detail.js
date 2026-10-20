@@ -4,6 +4,9 @@
     let product;
     let selectedVariant;
     let cartRequestPending = false;
+    let reviewRequestPending = false;
+    let reviewSubmitted = false;
+    const uploadedReviewFiles = new Map();
 
     document.addEventListener('DOMContentLoaded', loadProduct);
 
@@ -343,46 +346,42 @@
 
     async function submitReview(event, orderItemId) {
         event.preventDefault();
+        if (reviewRequestPending || reviewSubmitted) return;
         const form = event.currentTarget;
+        if (!form.reportValidity()) return;
         const button = form.querySelector('button[type="submit"]');
-        const token = localStorage.getItem('authToken') || localStorage.getItem('token');
-        const headers = { 'Content-Type': 'application/json' };
-        if (token) headers.Authorization = `Bearer ${token}`;
-        const guestToken = sessionStorage.getItem('guestOrderToken');
-        if (guestToken) headers['X-Order-Token'] = guestToken;
+        const headers = reviewAccessHeaders();
+        if (!headers.Authorization && !headers['X-Order-Token']) {
+            notify('Hãy mở lại đơn hàng và xác minh quyền truy cập trước khi đánh giá.', 'warning');
+            return;
+        }
+        reviewRequestPending = true;
         button.disabled = true;
         try {
-            const files = Array.from(document.getElementById('reviewImages')?.files || []);
-            if (files.length > 5) throw new Error('Mỗi đánh giá có tối đa 5 ảnh.');
-            const imageUrls = [];
-            for (const file of files) {
-                const data = new FormData();
-                data.append('orderItemId', String(orderItemId));
-                data.append('image', file);
-                const uploadHeaders = {};
-                if (token) uploadHeaders.Authorization = `Bearer ${token}`;
-                if (guestToken) uploadHeaders['X-Order-Token'] = guestToken;
-                const upload = await fetch('/api/uploads/review', {
-                    method: 'POST', headers: uploadHeaders, body: data
-                });
-                const uploaded = await upload.json().catch(() => ({}));
-                if (!upload.ok || !uploaded.url) {
-                    throw new Error(uploaded.message || 'Không thể tải ảnh đánh giá.');
-                }
-                imageUrls.push(uploaded.url);
-            }
+            const imageUrls = await BeautyUI.uploadEvidence(document.getElementById('reviewImages')?.files,
+                'review', orderItemId, headers, uploadedReviewFiles);
             const response = await fetch('/api/reviews', {
-                method: 'POST', headers,
+                method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ orderItemId: Number(orderItemId), stars: Number(document.getElementById('reviewStars').value), title: document.getElementById('reviewTitle').value.trim(), content: document.getElementById('reviewContent').value.trim(), skinType: document.getElementById('reviewSkinType').value.trim(), imageUrls })
             });
             if (!response.ok) {
                 const payload = await response.json().catch(() => ({}));
                 throw new Error(payload.message || payload.error || 'Không thể gửi đánh giá.');
             }
+            reviewSubmitted = true;
+            button.textContent = 'Đã gửi, chờ duyệt';
             form.reset();
             notify('Cảm ơn bạn! Đánh giá đã được gửi và đang chờ duyệt.', 'success');
         } catch (error) { notify(error.message, 'danger'); }
-        finally { button.disabled = false; }
+        finally { reviewRequestPending = false; button.disabled = reviewSubmitted; }
+    }
+
+    function reviewAccessHeaders() {
+        const orderNumber = new URLSearchParams(window.location.search).get('orderNumber');
+        const guestToken = orderNumber && sessionStorage.getItem(`beautystore:order-token:${orderNumber}`);
+        if (guestToken) return { 'X-Order-Token': guestToken };
+        const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+        return token ? { Authorization: `Bearer ${token}` } : {};
     }
 
     async function submitCart(buyNow) {
@@ -520,7 +519,7 @@
     }
 
     function variantLabel(variant) {
-        return BeautyUI.text(variant.label || [variant.shadeName, variant.volume && `${variant.volume} ${variant.volumeUnit || ''}`].filter(Boolean).join(' · '), 'Tiêu chuẩn');
+        return BeautyUI.variantLabel(variant) || 'Tiêu chuẩn';
     }
 
     function validHex(value) { return /^#[0-9a-f]{6}$/i.test(value || '') ? value : ''; }

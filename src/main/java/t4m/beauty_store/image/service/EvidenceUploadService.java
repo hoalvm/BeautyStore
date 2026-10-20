@@ -153,8 +153,11 @@ public class EvidenceUploadService {
             }
             try {
                 URI uri = URI.create(normalized);
-                if (!"https".equalsIgnoreCase(uri.getScheme())
-                        || uri.getHost() == null || uri.getUserInfo() != null) {
+                // Local URLs are issued only by the demo provider. Ownership is still checked
+                // against the exact pending-upload record; callers cannot inject arbitrary files.
+                boolean localDemoImage = normalized.matches("/demo/media/[a-f0-9-]{36}\\.(png|jpg|jpeg|webp)");
+                if (!localDemoImage && (!"https".equalsIgnoreCase(uri.getScheme())
+                        || uri.getHost() == null || uri.getUserInfo() != null)) {
                     throw new IllegalArgumentException("URL ảnh không hợp lệ");
                 }
             } catch (RuntimeException exception) {

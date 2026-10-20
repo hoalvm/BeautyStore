@@ -505,11 +505,12 @@ function displayOrderDetails(order) {
         unitPrice.className = 'text-muted';
         unitPrice.textContent = `${formatPrice(item.price)} × ${Number(item.quantity) || 0}`;
         total.append(subtotal, unitPrice);
-        if (order.status === 'DELIVERED' && item.productId && item.id) {
-            const review = document.createElement('a');
+        if (order.status === 'DELIVERED' && item.id) {
+            const review = document.createElement('button');
+            review.type = 'button';
             review.className = 'btn btn-sm btn-outline-warning mt-2 d-block';
-            review.href = `/product/${encodeURIComponent(item.productId)}?orderItemId=${encodeURIComponent(item.id)}`;
             review.textContent = 'Viết đánh giá';
+            review.addEventListener('click', () => openOrderReview(order, item, review));
             total.appendChild(review);
             const returnButton = document.createElement('button');
             returnButton.type = 'button';
@@ -570,7 +571,98 @@ function orderAccessHeaders(orderNumber, json = false) {
     return headers;
 }
 
+let orderReviewRequestPending = false;
+
+function openOrderReview(order, item, actionButton) {
+    if (orderReviewRequestPending) return;
+    const previous = document.getElementById('orderReviewModal');
+    if (previous) {
+        bootstrap.Modal.getInstance(previous)?.dispose();
+        previous.remove();
+    }
+    const modal = document.createElement('div');
+    modal.id = 'orderReviewModal';
+    modal.className = 'modal fade';
+    modal.tabIndex = -1;
+    modal.setAttribute('aria-labelledby', 'orderReviewTitle');
+    modal.setAttribute('aria-hidden', 'true');
+    // All interpolated user/order data is assigned through textContent below.
+    modal.innerHTML = `
+        <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+            <div class="modal-header"><h2 class="modal-title h5" id="orderReviewTitle">Viết đánh giá</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>
+            <form id="orderReviewForm">
+                <div class="modal-body">
+                    <p class="small text-muted">Đánh giá sản phẩm đã nhận, kể cả khi sản phẩm đã ngừng bán. Nội dung sẽ hiển thị sau khi được duyệt.</p>
+                    <label for="orderReviewStars" class="form-label">Số sao</label>
+                    <select id="orderReviewStars" class="form-select mb-3" required><option value="5">5 – Rất hài lòng</option><option value="4">4 – Hài lòng</option><option value="3">3 – Bình thường</option><option value="2">2 – Chưa hài lòng</option><option value="1">1 – Không hài lòng</option></select>
+                    <label for="orderReviewHeading" class="form-label">Tiêu đề</label>
+                    <input id="orderReviewHeading" class="form-control mb-3" maxlength="120">
+                    <label for="orderReviewContent" class="form-label">Nội dung</label>
+                    <textarea id="orderReviewContent" class="form-control mb-3" rows="4" maxlength="3000"></textarea>
+                    <label for="orderReviewSkinType" class="form-label">Loại da của bạn</label>
+                    <input id="orderReviewSkinType" class="form-control mb-3" maxlength="50">
+                    <label for="orderReviewImages" class="form-label">Ảnh thực tế (tối đa 5)</label>
+                    <input id="orderReviewImages" class="form-control mb-3" type="file" accept="image/jpeg,image/png,image/webp" multiple>
+                    <p id="orderReviewMessage" class="small mb-0" role="status" aria-live="polite"></p>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Đóng</button>
+                    <button type="submit" class="btn btn-danger" id="orderReviewSubmit">Gửi đánh giá</button></div>
+            </form>
+        </div></div>`;
+    document.body.appendChild(modal);
+    document.getElementById('orderReviewTitle').textContent = `Đánh giá: ${item.productName || 'Sản phẩm'}`;
+    const form = document.getElementById('orderReviewForm');
+    const button = document.getElementById('orderReviewSubmit');
+    const message = document.getElementById('orderReviewMessage');
+    const uploadedFiles = new Map();
+    let submitting = false;
+    let submitted = false;
+    form.addEventListener('submit', async event => {
+        event.preventDefault();
+        if (submitting || submitted || !form.reportValidity()) return;
+        submitting = true;
+        orderReviewRequestPending = true;
+        button.disabled = true;
+        message.className = 'small mb-0 text-muted';
+        message.textContent = 'Đang gửi đánh giá...';
+        try {
+            const imageUrls = await BeautyUI.uploadEvidence(document.getElementById('orderReviewImages').files,
+                'review', item.id, orderAccessHeaders(order.orderNumber), uploadedFiles);
+            const response = await fetch('/api/reviews', {
+                method: 'POST', headers: orderAccessHeaders(order.orderNumber, true),
+                body: JSON.stringify({
+                    orderItemId: Number(item.id), stars: Number(document.getElementById('orderReviewStars').value),
+                    title: document.getElementById('orderReviewHeading').value.trim(),
+                    content: document.getElementById('orderReviewContent').value.trim(),
+                    skinType: document.getElementById('orderReviewSkinType').value.trim(), imageUrls
+                })
+            });
+            if (!response.ok) throw new Error(await BeautyUI.errorMessage(response, 'Không thể gửi đánh giá.'));
+            submitted = true;
+            message.className = 'small mb-0 text-success';
+            message.textContent = 'Cảm ơn bạn! Đánh giá đã gửi và đang chờ duyệt.';
+            button.textContent = 'Đã gửi, chờ duyệt';
+            if (actionButton) {
+                actionButton.disabled = true;
+                actionButton.textContent = 'Đã gửi, chờ duyệt';
+            }
+        } catch (error) {
+            message.className = 'small mb-0 text-danger';
+            message.textContent = error.message;
+        } finally {
+            submitting = false;
+            orderReviewRequestPending = false;
+            button.disabled = submitted;
+        }
+    });
+    bootstrap.Modal.getOrCreateInstance(modal).show();
+}
+
 function openReturnRequest(order, item) {
+    const uploadedFiles = new Map();
+    let submitting = false;
+    let submitted = false;
     document.getElementById('beautyReturnModal')?.remove();
     const modal = document.createElement('div');
     modal.id = 'beautyReturnModal';
@@ -690,24 +782,21 @@ function openReturnRequest(order, item) {
 
     form.addEventListener('submit', async event => {
         event.preventDefault();
+        if (submitting || submitted || !form.reportValidity()) return;
+        submitting = true;
         submit.disabled = true;
         message.className = 'small mb-0 text-muted';
         message.textContent = 'Đang gửi yêu cầu...';
         try {
             const files = Array.from(images.files || []);
-            if (files.length > 5) throw new Error('Tối đa 5 ảnh bằng chứng.');
-            const imageUrls = [];
-            for (const file of files) {
-                const data = new FormData();
-                data.append('orderItemId', String(item.id));
-                data.append('image', file);
-                const upload = await fetch('/api/uploads/return', {
-                    method: 'POST', headers: orderAccessHeaders(order.orderNumber), body: data
-                });
-                const uploaded = await upload.json().catch(() => ({}));
-                if (!upload.ok || !uploaded.url) throw new Error(uploaded.message || 'Không thể tải ảnh bằng chứng.');
-                imageUrls.push(uploaded.url);
+            if (reason.value === 'UNOPENED_CHANGE_OF_MIND' && !sealed.checked) {
+                throw new Error('Sản phẩm đổi ý phải còn nguyên seal.');
             }
+            if (['WRONG_ITEM', 'DAMAGED', 'DEFECTIVE'].includes(reason.value) && !files.length) {
+                throw new Error('Vui lòng cung cấp ảnh cho hàng sai, lỗi hoặc hư hỏng.');
+            }
+            const imageUrls = await BeautyUI.uploadEvidence(files, 'return', item.id,
+                orderAccessHeaders(order.orderNumber), uploadedFiles);
             const response = await fetch('/api/returns', {
                 method: 'POST',
                 headers: orderAccessHeaders(order.orderNumber, true),
@@ -725,6 +814,7 @@ function openReturnRequest(order, item) {
             });
             const result = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(result.message || 'Không thể tạo yêu cầu đổi trả.');
+            submitted = true;
             message.className = 'small mb-0 text-success';
             message.textContent = `Đã tạo yêu cầu #${result.id}; trạng thái: ${result.status}.`;
             submit.remove();
@@ -733,6 +823,8 @@ function openReturnRequest(order, item) {
             message.className = 'small mb-0 text-danger';
             message.textContent = error.message || 'Không thể tạo yêu cầu đổi trả.';
             submit.disabled = false;
+        } finally {
+            submitting = false;
         }
     });
     bootstrap.Modal.getOrCreateInstance(modal).show();

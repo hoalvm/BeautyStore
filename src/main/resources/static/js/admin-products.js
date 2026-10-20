@@ -12,6 +12,11 @@ let currentBatchVariant = null;
 let currentInventoryAlertKind = 'low';
 let returnToProductModalAfterBatch = false;
 const variantDetailsCache = new Map();
+let productsRequest = 0;
+let productEditorRequest = 0;
+let variantsRequest = 0;
+let galleryRequest = 0;
+let batchesRequest = 0;
 
 document.addEventListener('DOMContentLoaded', async () => {
     if (!checkAdminAuth()) return;
@@ -333,6 +338,7 @@ async function responseError(response, fallback) {
 }
 
 async function loadProducts() {
+    const request = ++productsRequest;
     const tbody = document.getElementById('productsTableBody');
     showTableMessage('Đang tải dữ liệu...', 'spinner-border spinner-border-sm');
     const serverStockFiltered = Boolean(currentStockFilter && !currentSearch);
@@ -345,6 +351,11 @@ async function loadProducts() {
         const response = await fetch(`${endpoint}?${params}`, { headers: tokenHeaders() });
         if (!response.ok) throw new Error('Không thể tải danh sách sản phẩm.');
         let data = await response.json();
+        if (request !== productsRequest) return;
+        if (currentPage > 0 && currentPage >= Number(data.totalPages || 0)) {
+            currentPage = Math.max(0, Number(data.totalPages || 0) - 1);
+            return loadProducts();
+        }
         if (currentStockFilter && !serverStockFiltered) data = filterStockPage(data);
         renderProducts(data.content || []);
         updatePagination(data);
@@ -355,6 +366,7 @@ async function loadProducts() {
             result.textContent = currentSearch ? `Kết quả cho “${currentSearch}”${currentStockFilter ? ' · Tồn kho được lọc trong từng trang kết quả; chuyển trang để xem tiếp.' : ''}` : '';
         }
     } catch (error) {
+        if (request !== productsRequest) return;
         showTableMessage(error.message, 'fas fa-circle-exclamation text-danger');
     }
 }
@@ -406,8 +418,9 @@ function createProductRow(product) {
     const brandCell = textElement('td', brandHidden ? 'text-warning' : '',
         `${product.brand?.name || product.brandName || '—'}${brandHidden ? ' (đã ẩn)' : ''}`);
     const priceCell = document.createElement('td');
-    priceCell.appendChild(textElement('strong', variant.discountPrice ? 'text-danger' : '', formatPrice(variant.discountPrice || variant.price || product.minPrice)));
-    if (variant.discountPrice) priceCell.appendChild(textElement('div', 'small text-muted text-decoration-line-through', formatPrice(variant.price)));
+    const sale = variant.discountPrice != null && Number(variant.discountPrice) < Number(variant.price);
+    priceCell.appendChild(textElement('strong', sale ? 'text-danger' : '', formatPrice(sale ? variant.discountPrice : (variant.price ?? product.minPrice))));
+    if (sale) priceCell.appendChild(textElement('div', 'small text-muted text-decoration-line-through', formatPrice(variant.price)));
     const stockCell = document.createElement('td');
     const stock = productStock(product);
     stockCell.append(textElement('strong', '', String(stock)), stockBadge(stock));
@@ -445,6 +458,9 @@ function iconButton(title, style, icon) {
 }
 
 function openAddModal() {
+    ++productEditorRequest;
+    ++variantsRequest;
+    ++galleryRequest;
     editingProduct = null;
     editingVariant = null;
     document.getElementById('modalTitle').textContent = 'Thêm sản phẩm mỹ phẩm';
@@ -464,15 +480,19 @@ function openAddModal() {
 }
 
 async function editProduct(id) {
+    const request = ++productEditorRequest;
     try {
         const response = await fetch(`/api/admin/products/${id}`, { headers: tokenHeaders() });
         if (!response.ok) throw new Error('Không thể tải thông tin sản phẩm.');
-        editingProduct = await response.json();
+        const product = await response.json();
+        if (request !== productEditorRequest) return;
+        editingProduct = product;
         document.getElementById('modalTitle').textContent = 'Sửa sản phẩm mỹ phẩm';
         fillProductForm(editingProduct);
         await Promise.allSettled([loadVariants(id), loadGallery(id)]);
+        if (request !== productEditorRequest) return;
         bootstrap.Modal.getOrCreateInstance(document.getElementById('productModal')).show();
-    } catch (error) { showToast(error.message, 'danger'); }
+    } catch (error) { if (request === productEditorRequest) showToast(error.message, 'danger'); }
 }
 
 function fillProductForm(product) {
@@ -638,6 +658,7 @@ async function createVariantFromForm() {
 }
 
 async function loadVariants(productId) {
+    const request = ++variantsRequest;
     const section = document.getElementById('existingVariantsSection');
     const body = document.getElementById('variantsTableBody');
     section.classList.remove('d-none');
@@ -646,13 +667,14 @@ async function loadVariants(productId) {
         const response = await fetch(`/api/admin/products/${productId}/variants?includeInactive=true`, { headers: tokenHeaders() });
         if (!response.ok) throw new Error();
         const variants = await response.json();
+        if (request !== variantsRequest) return;
         populateImageVariantOptions(variants);
         variants.forEach(variant => {
             variantDetailsCache.set(String(variant.id), variant);
             body.appendChild(createVariantRow(variant));
         });
         if (!variants.length) body.appendChild(tableMessageRow('Chưa có biến thể.', 5));
-    } catch (_) { body.appendChild(tableMessageRow('Không thể tải biến thể.', 5)); }
+    } catch (_) { if (request === variantsRequest) body.appendChild(tableMessageRow('Không thể tải biến thể.', 5)); }
 }
 
 function populateImageVariantOptions(variants) {
@@ -719,16 +741,19 @@ function resetBatchForm() {
 }
 
 async function loadBatches(variantId) {
+    const request = ++batchesRequest;
     const body = document.getElementById('batchesTableBody');
     body.replaceChildren(tableMessageRow('Đang tải dữ liệu lô...', 8));
     try {
         const response = await fetch(`/api/admin/variants/${encodeURIComponent(variantId)}/batches`, { headers: tokenHeaders() });
         if (!response.ok) throw new Error(await responseError(response, 'Không thể tải dữ liệu lô.'));
         const batches = await response.json();
+        if (request !== batchesRequest) return;
         body.replaceChildren();
         batches.forEach(batch => body.appendChild(createBatchRow(batch)));
         if (!batches.length) body.appendChild(tableMessageRow('Biến thể này chưa có lô tồn kho.', 8));
     } catch (error) {
+        if (request !== batchesRequest) return;
         body.replaceChildren(tableMessageRow(error.message, 8));
     }
 }
@@ -856,6 +881,7 @@ async function uploadProductImage(productId, file, firstImage) {
 }
 
 async function loadGallery(productId) {
+    const request = ++galleryRequest;
     const section = document.getElementById('galleryManagementSection');
     const list = document.getElementById('galleryList');
     section.classList.remove('d-none');
@@ -864,10 +890,12 @@ async function loadGallery(productId) {
         const response = await fetch(`/api/admin/products/${encodeURIComponent(productId)}/images`, { headers: tokenHeaders() });
         if (!response.ok) throw new Error(await responseError(response, 'Không thể tải gallery.'));
         const images = await response.json();
+        if (request !== galleryRequest) return;
         list.replaceChildren();
         images.forEach(image => list.appendChild(createGalleryCard(productId, image)));
         if (!images.length) list.appendChild(textElement('p', 'text-muted col-12', 'Sản phẩm chưa có ảnh trong gallery.'));
     } catch (error) {
+        if (request !== galleryRequest) return;
         list.replaceChildren(textElement('p', 'text-danger col-12', error.message));
     }
 }

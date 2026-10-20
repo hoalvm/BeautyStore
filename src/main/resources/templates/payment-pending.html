@@ -40,6 +40,10 @@
                             <i class="fas fa-shield-alt me-2"></i>
                             <span id="paymentPendingGuidance">Mỗi lần đặt hàng chỉ có một liên kết VNPay. Trang này sẽ tự cập nhật khi BeautyStore nhận kết quả từ VNPay. Nếu đã rời cổng thanh toán, hãy hủy đơn và đặt lại; hệ thống không cấp lại liên kết cũ.</span>
                         </div>
+                        <div class="alert alert-warning text-start" th:unless="${vnpayAvailable}">
+                            VNPay hiện chưa được cấu hình. Đơn chờ thanh toán vẫn được kiểm tra trạng thái;
+                            bạn có thể hủy đơn chưa thanh toán rồi đặt lại bằng COD. Không thanh toán vào liên kết do người khác gửi.
+                        </div>
 
                         <!-- Cancel Order Button -->
                         <div>

@@ -18,7 +18,7 @@ import java.time.LocalDate;
 import java.util.*;
 
 @Component
-@Profile({"dev", "test"})
+@Profile({"demo", "dev", "test"})
 @Order(10)
 @RequiredArgsConstructor
 public class BeautyStoreCatalogSeeder implements ApplicationRunner {

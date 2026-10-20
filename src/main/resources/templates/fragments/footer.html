@@ -28,7 +28,7 @@
             <div class="col-lg-2 col-md-6">
                 <h6 class="text-warning mb-3">Thanh toán</h6>
                 <div class="d-flex flex-wrap gap-2" aria-label="Phương thức thanh toán">
-                    <span class="badge bg-light text-dark">COD</span><span class="badge bg-light text-dark">VNPay</span>
+                    <span class="badge bg-light text-dark">COD</span><span th:if="${vnpayAvailable}" class="badge bg-light text-dark">VNPay</span>
                 </div>
                 <p class="small text-light mt-3 mb-0">Thông tin sản phẩm mang tính tham khảo, không thay thế tư vấn y khoa.</p>
             </div>
@@ -38,7 +38,7 @@
             <small>Thị trường Việt Nam · Giá hiển thị bằng VND</small>
         </div>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/vendor/bootstrap-5.3.0/bootstrap.bundle.min.js"></script>
     <script th:src="@{/js/footer.js}"></script>
     <div id="chatbot-root" th:attr="data-hotline=${@storeProperties.hotline}"></div>
     <link rel="stylesheet" th:href="@{/css/chatbot.css}">
