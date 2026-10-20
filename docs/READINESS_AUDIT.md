@@ -15,7 +15,7 @@ luồng thương mại, cấu hình mặc định và quy trình clone/build/run
 | Password/JWT | Hỗ trợ đầy đủ 128 ký tự/Unicode qua BCrypt có prehash/version, vẫn nhận hash cũ; JWT mới gắn user ID; role trả về có thứ tự ổn định, chặn gán role không hỗ trợ. |
 | Commerce | Sửa DTO detached làm admin status/return trả 500 sau khi DB đã commit; chặn reject return đã restock; kiểm cấu hình VNPay trước mọi thay đổi giỏ/kho. |
 | Gallery/review | Khóa theo product cho giới hạn gallery/primary/delete; duyệt review đồng thời không làm sai rating summary. |
-| Frontend | Gắn guest order token đúng đơn; đánh giá trực tiếp từ receipt cho sản phẩm đã ẩn; chống submit trùng, upload lại và response admin đến sai thứ tự. |
+| Frontend | Gắn guest order token đúng đơn, kể cả sau khi đăng nhập member; đánh giá từ receipt cho sản phẩm đã ẩn; chống submit trùng/upload lại/response admin đến sai thứ tự; đóng modal đúng sau animation; chat không che nút modal trên mobile. |
 | Assets | Self-host Bootstrap, Font Awesome, Chart.js và fonts kèm license; bỏ URL Chart CSS không tồn tại. |
 | Secrets | Loại giá trị credential khỏi `.env.example`; kiểm prod JWT/HTTPS chặt hơn. Chủ sở hữu phải thu hồi/đổi khóa đã lộ trong lịch sử. |
 
@@ -24,10 +24,11 @@ Không sửa V1–V17, không xóa database MySQL, không xóa đơn/người d�
 
 ## Kiểm chứng tự động
 
-- `mvn clean install`: thành công trên source snapshot sạch, không `.env`/database có sẵn.
+- `mvn clean install`: thành công trong workspace và bản `git clone` local sạch,
+  không `.env`/database có sẵn. Revision code cuối kiểm chứng: `198a436`.
 - Backend: **265 tests**, 264 pass, 0 failure/error, 1 MySQL Testcontainers skip khi không có Docker.
 - `npm run check`: 27 nguồn JavaScript và tham chiếu asset hợp lệ.
-- `npm test`: **99/99 pass**.
+- `npm test`: **103/103 pass**.
 - Integration tests dùng HTTP controller/security/service/database thực, tắt Open Session in View:
   - đăng ký → email OTP thật → kích hoạt → login → reset mật khẩu;
   - guest/member cart, merge một lần, checkout COD, kiểm role/ownership;
@@ -37,18 +38,33 @@ Không sửa V1–V17, không xóa database MySQL, không xóa đơn/người d�
   - concurrency gallery, review aggregate, shipper và support; khóa tài khoản và stale write;
   - sandbox mailbox, chặn client/Host không loopback, prod/demo isolation, ảnh giả/path traversal.
 
-CI chạy Docker trước full verify và kiểm tra XML để **không chấp nhận migration test bị skip**.
-CI còn khởi động JAR với profile mặc định, kiểm catalog 40 sản phẩm, inbox và static assets.
+Workflow CI được cấu hình chạy Docker trước full verify và kiểm tra XML để
+**không chấp nhận migration test bị skip**. CI còn khởi động JAR với profile mặc định,
+kiểm catalog 40 sản phẩm, inbox và static assets. Chưa chạy workflow remote trong đợt
+này vì không push repository.
 
 ## Kiểm chứng chạy thực
 
 - `mvn spring-boot:run` không profile, không `.env`, không MySQL: HTTP 200,
   8 nhóm/40 sản phẩm được seed.
 - Upload ảnh admin → GET ảnh PNG → xóa ảnh thử: HTTP 200/200/204.
-- Trình duyệt: guest chọn sản phẩm → giỏ → COD → yêu cầu OTP → hộp thư sandbox → xem đơn.
+- Trình duyệt: guest chọn sản phẩm → giỏ → COD → OTP → xem đơn; admin xác nhận →
+  shipper nhận/giao → guest đánh giá → admin duyệt → guest gửi return có ảnh WebP →
+  admin duyệt/nhận/restock/ghi nhận hoàn tiền.
+- Member đăng nhập, hồ sơ, thêm/xem favorite; member mở lại đơn guest bằng token OTP
+  đúng đơn đã lưu trong cùng phiên trình duyệt.
+- Mobile 390×844: menu, bộ lọc, skip link bằng bàn phím, modal return đủ trường/nút;
+  không tràn ngang. Kiểm tra stacking xác nhận chat nằm dưới lớp modal.
+- Không quan sát thấy uncaught JavaScript error trong các luồng trên; script/style
+  đã kiểm tra tải cùng origin.
 - Hộp thư dùng iframe `sandbox` + CSP, không nới `X-Frame-Options: DENY` của ứng dụng.
+- Bản clone chạy đúng `mvn spring-boot:run` sau `mvn clean install`, catalog 40 và
+  8 danh mục. Dừng/chạy lại vẫn giữ favorite thử; seeder tạo thêm **0** sản phẩm.
+- Đã dừng server/browser thử nghiệm sau kiểm tra để không giữ cổng 8080.
 
-Kết quả clone cuối và phần browser đa role được bổ sung sau vòng kiểm tra cuối.
+Các commit nằm local trên `frontend`, tác giả `PHAMQUOCDUY11052006`.
+Không merge/push; `main`, `origin/main` và `backend` giữ nguyên.
+Clone từ GitHub **chưa nhận được** thay đổi local cho tới khi chủ repo tự push nhánh.
 
 ## Giới hạn và checklist trước triển khai thật
 
@@ -68,6 +84,8 @@ Kết quả clone cuối và phần browser đa role được bổ sung sau vòn
    rồi sao chép toàn bộ `.beautystore`; tuyệt đối không dùng khóa/tài khoản demo trên production.
 8. Yêu cầu JDK 24+ và Maven 3.9+, Internet lần tải dependencies đầu. Docker chỉ cần cho
    migration integration test; Node chỉ cần bộ test frontend.
+9. Browser smoke dùng Chromium; chưa kiểm thử exhaustive mọi browser, mọi tổ hợp
+   filter/admin CRUD, tải đồng thời lớn hoặc accessibility bằng screen reader thực.
 
 Không có cam kết “không thể phát sinh lỗi”. Kết luận phải dựa trên những luồng đã chạy,
 test regression và các giới hạn nêu rõ ở trên.
