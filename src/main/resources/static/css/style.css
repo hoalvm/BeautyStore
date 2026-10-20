@@ -113,6 +113,12 @@ h2 {
     z-index: 1;
     overflow-x: auto;
     flex-wrap: nowrap;
+    /* Keep touch/trackpad scrolling and keyboard access without a visible rail. */
+    scrollbar-width: none;
+}
+
+.category-nav .navbar-nav::-webkit-scrollbar {
+    display: none;
 }
 
 .category-nav .nav-link {
