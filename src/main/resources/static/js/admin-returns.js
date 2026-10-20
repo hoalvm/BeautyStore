@@ -133,9 +133,21 @@ async function mutate(url, method, body) {
         const response = await fetch(url, { method, headers: headers(true), body: JSON.stringify(body) });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(payload.message || 'Không thể cập nhật yêu cầu.');
-        notify('Đã cập nhật yêu cầu đổi trả.', 'success'); returnModal.hide(); await loadReturns();
+        notify('Đã cập nhật yêu cầu đổi trả.', 'success'); hideReturnModal(); await loadReturns();
     } catch (error) { notify(error.message, 'danger'); }
     finally { returnMutationPending = false; buttons.forEach(button => { button.disabled = false; }); }
+}
+
+function hideReturnModal() {
+    const modal = document.getElementById('returnModal');
+    // Bootstrap ignores hide() while the opening transition is still running.
+    // A fast local response must not leave stale status/actions in an open modal.
+    const afterShown = () => returnModal.hide();
+    modal.addEventListener('shown.bs.modal', afterShown, { once: true });
+    modal.addEventListener('hidden.bs.modal', () => {
+        modal.removeEventListener('shown.bs.modal', afterShown);
+    }, { once: true });
+    returnModal.hide();
 }
 
 function tableMessage(message, danger = false) { const row = document.createElement('tr'); const item = element('td', `text-center py-5 ${danger ? 'text-danger' : 'text-muted'}`, message); item.colSpan=6; row.appendChild(item); document.getElementById('returnsBody').replaceChildren(row); }
