@@ -66,29 +66,21 @@ public class AdminProductImageController {
             @PathVariable Long productId,
             @PathVariable Long id,
             @Valid @RequestBody ProductImageRequest request) {
-        assertOwnership(productId, id);
-        ProductImage image = imageService.update(id, request);
+        ProductImage image = imageService.update(productId, id, request);
         return ProductImageResponse.fromEntity(image);
     }
 
     @PatchMapping("/{id}/primary")
     public ProductImageResponse setPrimary(@PathVariable Long productId, @PathVariable Long id) {
-        assertOwnership(productId, id);
-        ProductImage image = imageService.setPrimary(id);
+        ProductImage image = imageService.setPrimary(productId, id);
         return ProductImageResponse.fromEntity(image);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long productId, @PathVariable Long id) {
-        assertOwnership(productId, id);
-        ProductImage image = imageService.delete(id);
+        ProductImage image = imageService.delete(productId, id);
         if (image.getCloudinaryPublicId() != null) cloudinaryService.deleteImage(image.getCloudinaryPublicId());
         return ResponseEntity.noContent().build();
     }
 
-    private void assertOwnership(Long productId, Long imageId) {
-        if (!productId.equals(imageService.getImage(imageId).getProduct().getId())) {
-            throw new IllegalArgumentException("Product image does not belong to product");
-        }
-    }
 }

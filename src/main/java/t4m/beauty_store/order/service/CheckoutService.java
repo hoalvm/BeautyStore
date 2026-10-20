@@ -23,9 +23,17 @@ public class CheckoutService {
     private final CheckoutRateLimiter checkoutRateLimiter;
     private final CheckoutGuardService checkoutGuardService;
 
+    public void validatePaymentAvailability(CheckoutRequest request) {
+        if (request != null && request.getPaymentMethod() != null
+                && "VNPAY".equalsIgnoreCase(request.getPaymentMethod().trim())) {
+            vnPayService.requireAvailable();
+        }
+    }
+
     @Transactional
     public CheckoutResult checkout(CartIdentity identity, CheckoutRequest request,
             HttpServletRequest httpRequest) {
+        validatePaymentAvailability(request);
         checkoutRateLimiter.check(identity, request,
             httpRequest == null ? null : httpRequest.getRemoteAddr());
         checkoutGuardService.verifyOpenOrderQuota(identity, request);

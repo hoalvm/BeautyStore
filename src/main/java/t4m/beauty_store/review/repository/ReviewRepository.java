@@ -9,6 +9,8 @@ import t4m.beauty_store.review.entity.Review;
 import t4m.beauty_store.review.entity.ReviewStatus;
 
 public interface ReviewRepository extends JpaRepository<Review, Long> {
+    @Query("select r.product.id from Review r where r.id = :id")
+    java.util.Optional<Long> findProductIdById(@Param("id") Long id);
     boolean existsByOrderItemId(Long orderItemId);
     boolean existsByUserId(Long userId);
     Page<Review> findByProductIdAndStatusOrderByCreatedAtDesc(Long productId, ReviewStatus status, Pageable pageable);

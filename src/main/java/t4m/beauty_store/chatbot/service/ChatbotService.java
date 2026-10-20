@@ -13,6 +13,10 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
@@ -72,6 +76,8 @@ public class ChatbotService {
     private final IntentRecognitionService intentRecognitionService;
     private final InteractionLoggingService interactionLoggingService;
     private final StoreProperties storeProperties;
+    private final TransactionTemplate catalogTransactions;
+    private final Environment environment;
     private final RestTemplate restTemplate = createRestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Map<String, Deque<Map<String, String>>> conversationHistory = new ConcurrentHashMap<>();
@@ -92,12 +98,17 @@ public class ChatbotService {
                           CategoryRepository categoryRepository,
                           IntentRecognitionService intentRecognitionService,
                           InteractionLoggingService interactionLoggingService,
-                          StoreProperties storeProperties) {
+                          StoreProperties storeProperties,
+                          PlatformTransactionManager transactionManager,
+                          Environment environment) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
         this.intentRecognitionService = intentRecognitionService;
         this.interactionLoggingService = interactionLoggingService;
         this.storeProperties = storeProperties;
+        this.catalogTransactions = new TransactionTemplate(transactionManager);
+        this.catalogTransactions.setReadOnly(true);
+        this.environment = environment;
     }
 
     public String generateResponse(String userMessage, String conversationId) {
@@ -132,14 +143,19 @@ public class ChatbotService {
             state.setCurrentStage(ConversationState.ConversationStage.AWAITING_HANDOFF);
             return buildHandoffResponse();
         }
-        if (!isGeminiConfigured()) {
-            logger.warn("Gemini integration is not configured");
-            return technicalErrorResponse();
-        }
-
         try {
-            CatalogSnapshot catalog = loadActiveCatalog();
-            String catalogContext = buildCatalogContext(catalog, message, intent);
+            if (!isGeminiConfigured()) {
+                String reply = catalogTransactions.execute(status ->
+                    buildLocalResponse(loadActiveCatalog(), message, intent));
+                addToHistory(history, "user", message);
+                addToHistory(history, "assistant", reply);
+                updateConversationStage(state, intent);
+                return reply;
+            }
+            // Materialize strings inside a short read transaction. Never keep a
+            // Hibernate session/connection open during the external AI request.
+            String catalogContext = catalogTransactions.execute(status ->
+                buildCatalogContext(loadActiveCatalog(), message, intent));
             addToHistory(history, "user", message);
             String recentConversation = buildConversationContext(history, 6);
             String userPrompt = buildUserPrompt(intent, catalogContext, recentConversation, message);
@@ -184,6 +200,46 @@ public class ChatbotService {
                 .filter(product -> productAvailableStock(product) > 0)
                 .toList();
         return new CatalogSnapshot(categories, products);
+    }
+
+    private String buildLocalResponse(CatalogSnapshot catalog, String message, IntentClassification intent) {
+        String introduction = "Chế độ hỗ trợ cơ bản (không dùng AI).\n\n";
+        if (intent.getIntent() == IntentClassification.Intent.POLICY_INQUIRY) {
+            return introduction + "Phí giao hàng tiêu chuẩn: " + formatVnd(storeProperties.getShippingFee())
+                + "; miễn phí khi tiền hàng sau giá sale đạt "
+                + formatVnd(storeProperties.getFreeShippingThreshold()) + ".\n"
+                + "Đổi hàng còn nguyên seal trong 7 ngày. Hàng giao sai, lỗi hoặc hư hỏng cần báo trong 48 giờ "
+                + "và cung cấp ảnh. Hàng đã mở vì không hợp màu hoặc kích ứng không tự động được chấp nhận đổi.\n"
+                + "Xem /return-policy hoặc chọn Hỗ trợ trực tiếp để trao đổi trường hợp cụ thể.";
+        }
+        if (intent.getIntent() == IntentClassification.Intent.ORDER_TRACKING) {
+            return introduction + "Thành viên xem đơn tại /orders. Khách mua không đăng nhập dùng mã đơn "
+                + "và email đặt hàng để nhận OTP ở trang xác nhận đơn. Không gửi OTP vào chat.\n"
+                + "Mình không thể xác nhận trạng thái đơn hàng chỉ từ tin nhắn; bạn có thể chọn Hỗ trợ trực tiếp.";
+        }
+        List<Product> matches = selectRelevantProducts(catalog.products(), message, intent).stream()
+            .filter(product -> intent.getIntent() != IntentClassification.Intent.PROMOTION_INQUIRY || isOnSale(product))
+            .limit(4).toList();
+        if (matches.isEmpty()) {
+            String categories = catalog.categories().stream().map(Category::getName)
+                .map(name -> safeCatalogText(name, 100)).collect(Collectors.joining(", "));
+            return introduction + "Chưa tìm thấy sản phẩm còn hàng khớp câu hỏi và ngân sách của bạn. "
+                + "Bạn có thể xem /products hoặc cho mình tên sản phẩm/nhu cầu cụ thể hơn.\n"
+                + "Danh mục đang bán: " + categories;
+        }
+        StringBuilder response = new StringBuilder(introduction)
+            .append("Các sản phẩm còn hàng trong catalog (giá và tồn kho sẽ được kiểm tra lại khi đặt hàng):\n");
+        matches.forEach(product -> response.append(formatProduct(product)).append('\n'));
+        if (intent.getIntent() == IntentClassification.Intent.ROUTINE_RECOMMENDATION) {
+            response.append("\nRoutine cơ bản tham khảo: làm sạch, dưỡng ẩm; ban ngày thêm chống nắng. "
+                + "Đây là danh sách catalog, chưa phải tư vấn cá nhân hóa.\n");
+        }
+        if (intent.getIntent() == IntentClassification.Intent.SHADE_MATCHING) {
+            response.append("\nMàu hiển thị có thể khác thực tế do ánh sáng và thiết bị; không thể bảo đảm hợp shade qua chat.\n");
+        }
+        response.append("\nHãy patch test trước khi dùng sản phẩm mới. Mỹ phẩm không thay thế điều trị; "
+            + "với phản ứng bất thường, thai kỳ hoặc bệnh lý da, hãy hỏi bác sĩ/chuyên gia.");
+        return response.toString();
     }
 
     private boolean isPubliclyVisible(Product product) {
@@ -547,7 +603,8 @@ public class ChatbotService {
     }
 
     private String buildHandoffResponse() {
-        return "Mình sẽ chuyển bạn sang kênh hỗ trợ trực tiếp của " + storeProperties.getName() + ".\n\n"
+        return "Bạn hãy chọn nút Hỗ trợ trực tiếp trong khung chat để mở phiên với chuyên viên "
+                + storeProperties.getName() + ". Tin nhắn này chưa tự tạo phiên hỗ trợ.\n\n"
                 + "Hotline: " + storeProperties.getHotline() + "\n"
                 + "Email: " + storeProperties.getSupportEmail();
     }
@@ -577,7 +634,7 @@ public class ChatbotService {
         int count = 0;
         while (iterator.hasNext() && count++ < limit) {
             Map<String, String> entry = iterator.next();
-            String speaker = "user".equals(entry.get("role")) ? "Khách" : "BeautyStore AI";
+            String speaker = "user".equals(entry.get("role")) ? "Khách" : "BeautyStore";
             context.insert(0, speaker + ": " + entry.get("message") + "\n");
         }
         return context.toString();
@@ -701,7 +758,8 @@ public class ChatbotService {
     }
 
     private boolean isGeminiConfigured() {
-        return geminiApiKey != null
+        return !environment.acceptsProfiles(Profiles.of("demo"))
+                && geminiApiKey != null
                 && !geminiApiKey.isBlank()
                 && !geminiApiKey.startsWith("${")
                 && !"YOUR_GEMINI_API_KEY_HERE".equals(geminiApiKey);

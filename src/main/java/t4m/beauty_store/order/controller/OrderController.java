@@ -35,6 +35,9 @@ public class OrderController {
             @Valid @RequestBody CheckoutRequest request,
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
+        // Fail before merging a guest cart or clearing its cookie as well as
+        // before creating/reserving an order when the gateway is unavailable.
+        checkoutService.validatePaymentAvailability(request);
         CartIdentity identity;
         if (principal == null) {
             identity = new CartIdentity(null,

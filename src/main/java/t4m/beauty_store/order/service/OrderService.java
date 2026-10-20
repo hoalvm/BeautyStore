@@ -223,7 +223,7 @@ public class OrderService {
         Order order = orderRepository.findByIdForUpdate(id)
             .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng"));
         OrderStatus previous = order.getStatus();
-        if (previous == newStatus) return order;
+        if (previous == newStatus) return initializeForResponse(order);
         validateAdminTransition(order, newStatus);
         if ((newStatus == OrderStatus.CONFIRMED || newStatus == OrderStatus.PROCESSING)
                 && previous == OrderStatus.PENDING && !Boolean.TRUE.equals(order.getInventoryCommitted())) {
@@ -245,7 +245,7 @@ public class OrderService {
             order.setDeliveredAt(StoreTime.now());
         }
         order.setStatus(newStatus);
-        return orderRepository.save(order);
+        return initializeForResponse(orderRepository.save(order));
     }
 
     /**
@@ -264,7 +264,20 @@ public class OrderService {
             throw new IllegalArgumentException("Tồn kho của đơn này đã được xử lý");
         }
         restoreCommittedInventory(order);
-        return orderRepository.save(order);
+        return initializeForResponse(orderRepository.save(order));
+    }
+
+    /**
+     * Locking queries deliberately do not fetch collections. Initialize the
+     * response associations while the service transaction is still open,
+     * including idempotent retries and failed deliveries with an assigned shipper.
+     */
+    private static Order initializeForResponse(Order order) {
+        order.getOrderItems().size();
+        if (order.getShipper() != null) {
+            order.getShipper().getEmail();
+        }
+        return order;
     }
 
     public BigDecimal getTotalRevenue() { return zeroIfNull(orderRepository.sumDeliveredRevenue()); }
