@@ -355,8 +355,13 @@ class FullCommerceWorkflowTests {
     private void deliver(long id) throws Exception {
         ok(put("/api/shipper/orders/" + id + "/accept").with(user(shipper).roles("SHIPPER")));
         mvc.perform(put("/api/shipper/orders/" + id + "/complete")
-            .with(user(createUser("other-shipper")).roles("SHIPPER"))).andExpect(status().isBadRequest());
-        JsonNode delivered = ok(put("/api/shipper/orders/" + id + "/complete")
+            .with(user(createUser("other-shipper")).roles("SHIPPER"))).andExpect(status().isForbidden());
+        var bytes = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(2, 2,
+            java.awt.image.BufferedImage.TYPE_INT_RGB), "png", bytes);
+        JsonNode delivered = ok(multipart(org.springframework.http.HttpMethod.PUT,
+            "/api/shipper/orders/" + id + "/complete")
+            .file(new org.springframework.mock.web.MockMultipartFile("image", "proof.png", "image/png", bytes.toByteArray()))
             .with(user(shipper).roles("SHIPPER")));
         assertThat(delivered.path("status").asText()).isEqualTo("DELIVERED");
         assertThat(delivered.path("paymentStatus").asText()).isEqualTo("COD_PAID");

@@ -7,6 +7,8 @@ import t4m.beauty_store.auth.repository.UserRepository;
 import t4m.beauty_store.order.entity.Order;
 import t4m.beauty_store.order.entity.OrderStatus;
 import t4m.beauty_store.order.repository.OrderRepository;
+import t4m.beauty_store.shipper.entity.DeliveryProof;
+import t4m.beauty_store.shipper.repository.DeliveryProofRepository;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -20,12 +22,17 @@ class ShipperServiceTests {
     private OrderRepository orderRepository;
     private UserRepository userRepository;
     private ShipperService service;
+    private DeliveryProofRepository proofRepository;
+    private DeliveryProofImageProcessor imageProcessor;
 
     @BeforeEach
     void setUp() {
         orderRepository = mock(OrderRepository.class);
         userRepository = mock(UserRepository.class);
-        service = new ShipperService(orderRepository, userRepository);
+        proofRepository = mock(DeliveryProofRepository.class);
+        imageProcessor = mock(DeliveryProofImageProcessor.class);
+        when(proofRepository.save(any(DeliveryProof.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        service = new ShipperService(orderRepository, userRepository, proofRepository, imageProcessor);
     }
 
     @Test
@@ -75,7 +82,7 @@ class ShipperServiceTests {
     }
 
     @Test
-    void completeAndFailBothReloadTheOrderWithAWriteLock() {
+    void completeAndFailBothReloadTheOrderWithAWriteLock() throws Exception {
         User shipper = shipper(10L, "shipper@beautystore.test");
         Order completing = order(OrderStatus.SHIPPING, shipper);
         Order failing = order(OrderStatus.SHIPPING, shipper);
@@ -84,14 +91,21 @@ class ShipperServiceTests {
         when(orderRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(failing));
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Order completed = service.completeDelivery(1L, shipper.getEmail());
+        var image = DeliveryProofImageProcessorTests.png(2, 2);
+        when(imageProcessor.prepare(image)).thenReturn(new byte[]{1, 2});
+        Order completed = service.completeDelivery(1L, shipper.getEmail(), image);
         Order failed = service.failDelivery(2L, shipper.getEmail(), "Customer unavailable");
 
         assertThat(completed.getStatus()).isEqualTo(OrderStatus.DELIVERED);
         assertThat(completed.getDeliveredAt()).isNotNull();
         assertThat(completed.getPaymentStatus()).isEqualTo("COD_PAID");
+        assertThat(completed.getDeliveryProof().getUploadedBy()).isEqualTo(shipper.getId());
+        assertThat(completed.getDeliveryProof().getUploadedAt()).isEqualTo(completed.getDeliveredAt());
+        service.completeDelivery(1L, shipper.getEmail(), image);
+        verify(proofRepository, times(1)).save(any());
+        verify(imageProcessor, times(1)).prepare(any());
         assertThat(failed.getStatus()).isEqualTo(OrderStatus.FAILED);
-        verify(orderRepository).findByIdForUpdate(1L);
+        verify(orderRepository, times(2)).findByIdForUpdate(1L);
         verify(orderRepository).findByIdForUpdate(2L);
         verify(orderRepository, never()).findById(anyLong());
     }
