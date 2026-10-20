@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -110,9 +111,14 @@ public class EmailService {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(
                     message, true, StandardCharsets.UTF_8.name());
-            if (fromAddress != null && !fromAddress.isBlank()) {
-                helper.setFrom(fromAddress.strip());
+            String sender = fromAddress;
+            if ((sender == null || sender.isBlank()) && mailSender instanceof JavaMailSenderImpl smtp) {
+                sender = smtp.getUsername();
             }
+            if (sender == null || sender.isBlank()) {
+                throw new IllegalStateException("Cần cấu hình MAIL_USERNAME để gửi email");
+            }
+            helper.setFrom(sender.strip());
             helper.setTo(recipient);
             helper.setSubject(safeHeader(subject));
 

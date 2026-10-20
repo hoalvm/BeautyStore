@@ -4,8 +4,6 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.Part;
 import jakarta.mail.Multipart;
 import jakarta.mail.internet.MimeMessage;
-import org.springframework.context.annotation.Profile;
-import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -14,10 +12,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
-/** In-memory replacement for a mail server, exclusively in the loopback-only demo. */
-@Component
-@Profile("demo")
-public class DemoMailbox {
+/** Test-only inbox; never packaged into the app or exposed through HTTP. */
+public class RecordingMailbox {
     private final ArrayDeque<Mail> messages = new ArrayDeque<>();
 
     public synchronized void deliver(MimeMessage message) throws MessagingException, IOException {

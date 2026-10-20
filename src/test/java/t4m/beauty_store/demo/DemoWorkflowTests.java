@@ -22,15 +22,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:demo-workflow;MODE=MySQL;NON_KEYWORDS=USER;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1",
         "spring.jpa.hibernate.ddl-auto=create-drop", "server.address=127.0.0.1",
-        "spring.flyway.enabled=false", "orders.reservation-cleanup-ms=86400000"
+        "spring.flyway.enabled=false", "orders.reservation-cleanup-ms=86400000",
+        "spring.config.import=", "spring.mail.from=mail-tests@example.test"
 })
+@org.springframework.context.annotation.Import(TestMailConfiguration.class)
 @ActiveProfiles("demo")
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class DemoWorkflowTests {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
-    @Autowired DemoMailbox mailbox;
+    @Autowired RecordingMailbox mailbox;
     @Autowired t4m.beauty_store.auth.service.EmailService emailService;
 
     @Test
@@ -71,8 +73,19 @@ class DemoWorkflowTests {
     @Test
     void demoPagesAssetsAndAccountsWorkWithoutExternalServices() throws Exception {
         mvc.perform(get("/")).andExpect(status().isOk())
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("/demo/inbox")));
-        mvc.perform(get("/demo/inbox")).andExpect(status().isOk());
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("/demo/inbox"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("Demo cục bộ"))));
+        // Retired URLs no longer have controllers or public security matchers.
+        mvc.perform(get("/demo/inbox")).andExpect(status().is3xxRedirection());
+        mvc.perform(get("/demo/api/mail")).andExpect(status().is3xxRedirection());
+        mvc.perform(get("/demo/mail/unknown")).andExpect(status().is3xxRedirection());
+        mvc.perform(get("/demo/api/mail").with(
+                org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors
+                    .user("member@example.test").roles("USER")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
         mvc.perform(get("/vendor/bootstrap-5.3.0/bootstrap.min.css")).andExpect(status().isOk());
         mvc.perform(get("/api/products")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(40));
@@ -88,16 +101,16 @@ class DemoWorkflowTests {
     }
 
     @Test
-    void localMailboxRejectsRemoteClientsAndReboundHosts() throws Exception {
-        mvc.perform(get("/demo/api/mail").with(request -> {
+    void localApplicationRejectsRemoteClientsAndReboundHosts() throws Exception {
+        mvc.perform(get("/").with(request -> {
             request.setRemoteAddr("192.0.2.20");
             return request;
         })).andExpect(status().isForbidden());
-        mvc.perform(get("/demo/api/mail").with(request -> {
+        mvc.perform(get("/").with(request -> {
             request.setServerName("attacker.example");
             return request;
         })).andExpect(status().isForbidden());
-        mvc.perform(get("/demo/api/mail")).andExpect(status().isOk())
+        mvc.perform(get("/")).andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"));
     }
 
@@ -113,11 +126,7 @@ class DemoWorkflowTests {
                         && mailbox.read(mail.id()).contains(action)));
         String id = mailbox.list().stream().filter(mail -> mail.recipient().contains(email)
                 && mailbox.read(mail.id()).contains(action)).findFirst().orElseThrow().id();
-        String rendered = mvc.perform(get("/demo/mail/" + id)).andExpect(status().isOk())
-                .andExpect(header().string("X-Frame-Options", "DENY"))
-                .andExpect(header().string("Content-Security-Policy",
-                        org.hamcrest.Matchers.containsString("sandbox")))
-                .andReturn().getResponse().getContentAsString();
+        String rendered = mailbox.read(id);
         var matcher = Pattern.compile(">(\\d{6})</span>").matcher(rendered);
         assertThat(matcher.find()).as("OTP rendered by the real email template").isTrue();
         return matcher.group(1);

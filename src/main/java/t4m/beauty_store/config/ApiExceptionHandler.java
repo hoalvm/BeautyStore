@@ -102,6 +102,12 @@ public class ApiExceptionHandler {
         return response(status, "HTTP_" + status.value(), message, Map.of(), request);
     }
 
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    ResponseEntity<ApiErrorResponse> missingResource(Exception exception, HttpServletRequest request) {
+        return response(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND",
+            "Không tìm thấy trang hoặc tài nguyên", Map.of(), request);
+    }
+
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiErrorResponse> unexpected(Exception exception, HttpServletRequest request) {
         Object trace = request.getAttribute(RequestTraceFilter.TRACE_ATTRIBUTE);

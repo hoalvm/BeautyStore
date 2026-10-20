@@ -2,19 +2,23 @@ package t4m.beauty_store.demo;
 
 import jakarta.mail.internet.MimeMessage;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Primary;
-import org.springframework.context.annotation.Profile;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 
-@Configuration
-@Profile("demo")
-public class DemoMailConfiguration {
+/** Email capture is test-only: the application always uses real SMTP. */
+@TestConfiguration(proxyBeanMethods = false)
+public class TestMailConfiguration {
+    @Bean
+    RecordingMailbox recordingMailbox() {
+        return new RecordingMailbox();
+    }
+
     @Bean
     @Primary
-    JavaMailSender demoMailSender(DemoMailbox mailbox) {
+    JavaMailSender testMailSender(RecordingMailbox mailbox) {
         return new JavaMailSenderImpl() {
             @Override
             protected void doSend(MimeMessage[] mimeMessages, Object[] originalMessages) {
