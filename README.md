@@ -65,7 +65,7 @@ mvn -version
 
 ### 2. Tạo cấu hình
 
-Clone repository và mở terminal tại thư mục có `pom.xml`. Sao chép `.env.example` thành `.env`, rồi điền thông tin Gmail.
+Sao chép `.env.example` thành `.env`. Điền `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` và `JWT_SECRET` riêng dài ít nhất 32 byte. Điền thêm thông tin Gmail để gửi OTP và Cloudinary để upload ảnh.
 
 ```sh
 git clone https://github.com/hoalvm/BeautyStore.git
@@ -77,8 +77,6 @@ git clone https://github.com/hoalvm/BeautyStore.git
 mvn clean install
 mvn spring-boot:run
 ```
-
-Mở **http://localhost:8080**. Dừng ứng dụng bằng `Ctrl + C`.
 
 ## Cấu Hình Gmail
 

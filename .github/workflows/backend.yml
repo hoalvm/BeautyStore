@@ -49,7 +49,7 @@ jobs:
 
       - name: Smoke test local startup without sending email
         run: |
-          java -jar target/beauty-store-0.0.1-SNAPSHOT.jar > target/demo-smoke.log 2>&1 &
+          java -jar target/beauty-store-0.0.1-SNAPSHOT.jar --spring.profiles.active=demo > target/demo-smoke.log 2>&1 &
           demo_pid=$!
           trap 'kill "$demo_pid" 2>/dev/null || true' EXIT
           ready=false

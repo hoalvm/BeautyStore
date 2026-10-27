@@ -15,10 +15,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class GmailConfigurationTests {
     @Test
-    void freshCloneTemplatePreservesLocalDefaultsWithoutPrivateCredentials() throws Exception {
+    void freshCloneTemplateTargetsDevWithoutPrivateCredentials() throws Exception {
         Properties settings = new Properties();
         for (String name : new String[]{"src/main/resources/application.properties",
-                "src/main/resources/application-demo.properties", ".env.example"}) {
+                "src/main/resources/application-dev.properties", ".env.example"}) {
             try (var input = Files.newInputStream(Path.of(name))) {
                 settings.load(input);
             }
@@ -31,9 +31,11 @@ class GmailConfigurationTests {
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     var environment = context.getEnvironment();
-                    assertThat(environment.getProperty("spring.datasource.url")).startsWith("jdbc:h2:file:");
-                    assertThat(environment.getProperty("spring.profiles.default")).isEqualTo("demo");
-                    assertThat(environment.getProperty("security.jwt.secret")).hasSizeGreaterThanOrEqualTo(32);
+                    assertThat(environment.getProperty("spring.datasource.url")).startsWith("jdbc:mysql:");
+                    assertThat(environment.getProperty("spring.profiles.default")).isEqualTo("dev");
+                    assertThat(environment.getProperty("spring.flyway.enabled")).isEqualTo("true");
+                    assertThat(environment.getProperty("spring.jpa.hibernate.ddl-auto")).isEqualTo("validate");
+                    assertThat(environment.getProperty("security.jwt.secret")).isEmpty();
                     assertThat(environment.getProperty("store.support-email")).isNotBlank();
                     assertThat(environment.getProperty("vnpay.tmn-code")).isEmpty();
                     assertThat(environment.getProperty("cloudinary.api-secret")).isEmpty();
@@ -42,10 +44,10 @@ class GmailConfigurationTests {
     }
 
     @Test
-    void defaultLocalProfileUsesAuthenticatedGmailInsteadOfCapturingOtp() throws Exception {
+    void devProfileUsesAuthenticatedGmailInsteadOfCapturingOtp() throws Exception {
         // Read tracked configuration only. Never load real .env credentials in tests.
         Properties settings = new Properties();
-        for (String name : new String[]{"application.properties", "application-demo.properties"}) {
+        for (String name : new String[]{"application.properties", "application-dev.properties"}) {
             try (var input = Files.newInputStream(Path.of("src/main/resources", name))) {
                 settings.load(input);
             }
